@@ -1,0 +1,18 @@
+{
+  "sdk": "openai-python",
+  "base_url": "https://ws-1t0eo80zukfizl68.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "model": "qwen3.6-max-preview",
+  "temperature": 0.4,
+  "max_tokens": 1600,
+  "timeout": 120,
+  "input_tokens": 6179,
+  "input_token_count_method": "tiktoken_estimate",
+  "api_key_source": "argument/env redacted",
+  "sample_id": "com.thecybernanny.adroapp",
+  "split": "test",
+  "top_static_positive": 20,
+  "top_static_negative": 10,
+  "top_global_static": 20,
+  "top_graph_nodes": 25,
+  "top_graph_edges": 20
+}

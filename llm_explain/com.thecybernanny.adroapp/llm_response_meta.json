@@ -1,0 +1,22 @@
+{
+  "sample_id": "com.thecybernanny.adroapp",
+  "model": "qwen3.6-max-preview",
+  "base_url": "https://ws-1t0eo80zukfizl68.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "elapsed_seconds": 231.71164536476135,
+  "input_tokens_estimated": 6179,
+  "input_token_count_method": "tiktoken_estimate",
+  "provider_usage": {
+    "completion_tokens": 5046,
+    "prompt_tokens": 8048,
+    "total_tokens": 13094,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": null,
+      "reasoning_tokens": 3552,
+      "rejected_prediction_tokens": null
+    },
+    "prompt_tokens_details": null
+  },
+  "response_path": "llm_explain/com.thecybernanny.adroapp/llm_response.md",
+  "raw_response_path": "llm_explain/com.thecybernanny.adroapp/llm_raw_response.json"
+}

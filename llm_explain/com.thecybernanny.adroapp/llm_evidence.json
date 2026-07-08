@@ -1,0 +1,667 @@
+{
+  "prediction": {
+    "apk_name": "com.thecybernanny.adroapp.apk",
+    "split": "test",
+    "final_prediction": "malware",
+    "final_prob_malware": 0.8829591364280476,
+    "modalities": {
+      "ensemble": {
+        "prob_malware": 0.8829591364280476,
+        "pred": "malware",
+        "source": "ensemble/ensemble_predictions.csv",
+        "prob_static": 0.8598249734672095,
+        "prob_graph": 0.9060932993888856,
+        "prob_image": 0.7012094259262085
+      },
+      "static": {
+        "prob_malware": 0.8598249734672095,
+        "pred": "malware",
+        "source": "inference/lightgbm/predictions/test_predictions.csv"
+      },
+      "graph": {
+        "prob_malware": 0.9060932993888855,
+        "pred": "malware",
+        "source": "inference/graph/predictions/test_predictions.csv"
+      }
+    }
+  },
+  "static_local_shap": {
+    "available": true,
+    "source": "explain/lightgbm/reports/test_com.thecybernanny.adroapp_waterfall_contributions.csv",
+    "apk_name": "com.thecybernanny.adroapp.apk",
+    "prob_malware": 0.8598249734672095,
+    "pred": 1,
+    "base_value": -3.4309521857334047,
+    "model_output": 1.813837018033356,
+    "top_positive_features": [
+      {
+        "rank": 1,
+        "feature": "api:org.json.JSONObject.getBoolean",
+        "feature_value": "3.784189633918261",
+        "shap_value": 0.6755737135259057,
+        "abs_shap_value": 0.6755737135259057,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 2,
+        "feature": "api:mono.android.net.wifi.p2p.WifiP2pManager_ConnectionInfoListenerImplementor.n_onConnectionInfoAvailable",
+        "feature_value": "0.0",
+        "shap_value": 0.5633444201850222,
+        "abs_shap_value": 0.5633444201850222,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 3,
+        "feature": "api:android.view.Window.getDecorView",
+        "feature_value": "4.276666119016055",
+        "shap_value": 0.4556221705851985,
+        "abs_shap_value": 0.4556221705851985,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 8,
+        "feature": "api:android.widget.EditText.<init>",
+        "feature_value": "0.6931471805599453",
+        "shap_value": 0.30583702960303516,
+        "abs_shap_value": 0.30583702960303516,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 9,
+        "feature": "api:android.os.BadParcelableException.<init>",
+        "feature_value": "2.302585092994046",
+        "shap_value": 0.30522617708861005,
+        "abs_shap_value": 0.30522617708861005,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 11,
+        "feature": "api:android.os.ResultReceiver.send",
+        "feature_value": "2.772588722239781",
+        "shap_value": 0.1933482963292374,
+        "abs_shap_value": 0.1933482963292374,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 13,
+        "feature": "api:java.lang.Integer.toOctalString",
+        "feature_value": "0.0",
+        "shap_value": 0.18725151594599376,
+        "abs_shap_value": 0.18725151594599376,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 15,
+        "feature": "api:java.lang.System.load",
+        "feature_value": "1.6094379124341003",
+        "shap_value": 0.17444660121880778,
+        "abs_shap_value": 0.17444660121880778,
+        "direction": "pushes_toward_malware"
+      }
+    ],
+    "top_negative_features": [
+      {
+        "rank": 4,
+        "feature": "api:java.security.KeyStore.load",
+        "feature_value": "2.9444389791664403",
+        "shap_value": -0.38387625864980385,
+        "abs_shap_value": 0.38387625864980385,
+        "direction": "pushes_toward_benign"
+      },
+      {
+        "rank": 5,
+        "feature": "api_pkg:javax.net.ssl",
+        "feature_value": "5.579729825986222",
+        "shap_value": -0.3517056989174312,
+        "abs_shap_value": 0.3517056989174312,
+        "direction": "pushes_toward_benign"
+      },
+      {
+        "rank": 6,
+        "feature": "api:java.security.KeyStore.getInstance",
+        "feature_value": "2.9444389791664403",
+        "shap_value": -0.3268824619931272,
+        "abs_shap_value": 0.3268824619931272,
+        "direction": "pushes_toward_benign"
+      },
+      {
+        "rank": 7,
+        "feature": "api:com.stub.StubApp.interface5",
+        "feature_value": "0.0",
+        "shap_value": -0.3235082653199471,
+        "abs_shap_value": 0.3235082653199471,
+        "direction": "pushes_toward_benign"
+      },
+      {
+        "rank": 10,
+        "feature": "opcode:const",
+        "feature_value": "9.18512512283512",
+        "shap_value": -0.23966622676853583,
+        "abs_shap_value": 0.23966622676853583,
+        "direction": "pushes_toward_benign"
+      },
+      {
+        "rank": 12,
+        "feature": "api:com.qihoo.util.a.<init>",
+        "feature_value": "0.0",
+        "shap_value": -0.18966759541922268,
+        "abs_shap_value": 0.18966759541922268,
+        "direction": "pushes_toward_benign"
+      },
+      {
+        "rank": 14,
+        "feature": "api:java.util.StringTokenizer.hasMoreTokens",
+        "feature_value": "2.0794415416798357",
+        "shap_value": -0.17798195063290864,
+        "abs_shap_value": 0.17798195063290864,
+        "direction": "pushes_toward_benign"
+      }
+    ]
+  },
+  "static_global_shap": {
+    "available": true,
+    "source": "explain/lightgbm/reports/test_shap_summary.csv",
+    "features": [
+      {
+        "rank": 1,
+        "feature": "api:mono.android.net.wifi.p2p.WifiP2pManager_ConnectionInfoListenerImplementor.n_onConnectionInfoAvailable",
+        "mean_abs_shap": 1.1324352764799648,
+        "mean_shap": -0.3520050609991438
+      },
+      {
+        "rank": 2,
+        "feature": "api:com.stub.StubApp.interface5",
+        "mean_abs_shap": 0.39320012471401283,
+        "mean_shap": -0.32307810796833175
+      },
+      {
+        "rank": 3,
+        "feature": "suspicious_string:ip",
+        "mean_abs_shap": 0.3523868872278856,
+        "mean_shap": -0.15592494982397292
+      },
+      {
+        "rank": 4,
+        "feature": "api:java.lang.String.lastIndexOf",
+        "mean_abs_shap": 0.3314226823548237,
+        "mean_shap": -0.06528555102035036
+      },
+      {
+        "rank": 5,
+        "feature": "api:android.view.Window.getDecorView",
+        "mean_abs_shap": 0.32799043955088864,
+        "mean_shap": 0.2814172971954967
+      },
+      {
+        "rank": 6,
+        "feature": "api_pkg:mono.android.media",
+        "mean_abs_shap": 0.2626701570357933,
+        "mean_shap": -0.08371719094050353
+      },
+      {
+        "rank": 7,
+        "feature": "api:android.widget.EditText.<init>",
+        "mean_abs_shap": 0.2161006557341028,
+        "mean_shap": 0.12291057857044176
+      },
+      {
+        "rank": 8,
+        "feature": "opcode:filled-new-array",
+        "mean_abs_shap": 0.21457617710642365,
+        "mean_shap": 0.20699931158848198
+      },
+      {
+        "rank": 9,
+        "feature": "api:com.qihoo.util.a.<init>",
+        "mean_abs_shap": 0.21216721978428538,
+        "mean_shap": -0.20290406332068284
+      },
+      {
+        "rank": 10,
+        "feature": "api_pkg:com.stub",
+        "mean_abs_shap": 0.20160174726355382,
+        "mean_shap": -0.19769067962155815
+      },
+      {
+        "rank": 11,
+        "feature": "api:org.json.JSONObject.getBoolean",
+        "mean_abs_shap": 0.19664345958691964,
+        "mean_shap": 0.07023748829651838
+      },
+      {
+        "rank": 12,
+        "feature": "api:android.os.BadParcelableException.<init>",
+        "mean_abs_shap": 0.18431638090507682,
+        "mean_shap": 0.16240816774049224
+      },
+      {
+        "rank": 13,
+        "feature": "api:android.view.Window.setType",
+        "mean_abs_shap": 0.17681513253536266,
+        "mean_shap": -0.1438569903302539
+      },
+      {
+        "rank": 14,
+        "feature": "api:com.stub.StubApp.ᵢˋ",
+        "mean_abs_shap": 0.15286696754260715,
+        "mean_shap": -0.15286696754260706
+      },
+      {
+        "rank": 15,
+        "feature": "api:android.widget.TableRow.addView",
+        "mean_abs_shap": 0.1504839509888689,
+        "mean_shap": 0.07224160949466238
+      },
+      {
+        "rank": 16,
+        "feature": "api:android.widget.EditText.getWindowToken",
+        "mean_abs_shap": 0.14391333393551956,
+        "mean_shap": 0.06419564045592419
+      },
+      {
+        "rank": 17,
+        "feature": "api:java.lang.Integer.toOctalString",
+        "mean_abs_shap": 0.14376895019103048,
+        "mean_shap": 0.047118987977761144
+      },
+      {
+        "rank": 18,
+        "feature": "opcode:nop",
+        "mean_abs_shap": 0.1425105690942878,
+        "mean_shap": 0.08074408067599341
+      },
+      {
+        "rank": 19,
+        "feature": "api:android.widget.TextView.setText",
+        "mean_abs_shap": 0.1343417673912333,
+        "mean_shap": -0.13137553744671127
+      },
+      {
+        "rank": 20,
+        "feature": "api:java.lang.Throwable.<init>",
+        "mean_abs_shap": 0.13338967910253893,
+        "mean_shap": 0.12005561953819113
+      }
+    ]
+  },
+  "graph_attention": {
+    "available": true,
+    "node_attention_source": "explain/graph/explanations/node_attention/com.thecybernanny.adroapp.csv",
+    "edge_attention_source": "explain/graph/explanations/edge_attention/com.thecybernanny.adroapp.csv",
+    "apk_name": "com.thecybernanny.adroapp.apk",
+    "prob_malware": 0.9060933589935303,
+    "pred": 1,
+    "top_nodes": [
+      {
+        "rank": 1,
+        "node_type": "package",
+        "local_index": 315,
+        "node_name": "cz.msebera.android.httpclient.pool",
+        "attention": 0.7500000000597026,
+        "normalized_attention": 0.0012695375682187312
+      },
+      {
+        "rank": 2,
+        "node_type": "package",
+        "local_index": 327,
+        "node_name": "io.appmetrica.analytics.coreutils.internal.time",
+        "attention": 0.7500000000000666,
+        "normalized_attention": 0.0012695375681177844
+      },
+      {
+        "rank": 3,
+        "node_type": "intent",
+        "local_index": 28,
+        "node_name": "android.intent.action.TIMEZONE_CHANGED",
+        "attention": 0.75,
+        "normalized_attention": 0.0012695375681176717
+      },
+      {
+        "rank": 4,
+        "node_type": "package",
+        "local_index": 320,
+        "node_name": "b0",
+        "attention": 0.75,
+        "normalized_attention": 0.0012695375681176717
+      },
+      {
+        "rank": 5,
+        "node_type": "package",
+        "local_index": 334,
+        "node_name": "com.huawei.hms.maps.model",
+        "attention": 0.75,
+        "normalized_attention": 0.0012695375681176717
+      },
+      {
+        "rank": 6,
+        "node_type": "package",
+        "local_index": 325,
+        "node_name": "cz.msebera.android.httpclient.client.utils",
+        "attention": 0.749675392111385,
+        "normalized_attention": 0.0012689880989049996
+      },
+      {
+        "rank": 7,
+        "node_type": "intent",
+        "local_index": 38,
+        "node_name": "com.huawei.android.push.intent.REGISTRATION",
+        "attention": 0.7493667182279751,
+        "normalized_attention": 0.001268465601449952
+      },
+      {
+        "rank": 8,
+        "node_type": "opcode",
+        "local_index": 206,
+        "node_name": "iget-short",
+        "attention": 0.748497823427897,
+        "normalized_attention": 0.0012669948086613636
+      },
+      {
+        "rank": 9,
+        "node_type": "intent",
+        "local_index": 31,
+        "node_name": "com.google.android.c2dm.intent.RECEIVE",
+        "attention": 0.7461552023988869,
+        "normalized_attention": 0.0012630294147891092
+      },
+      {
+        "rank": 10,
+        "node_type": "intent",
+        "local_index": 2,
+        "node_name": "android.intent.action.VIEW",
+        "attention": 0.7456384111813179,
+        "normalized_attention": 0.0012621546336350064
+      },
+      {
+        "rank": 11,
+        "node_type": "intent",
+        "local_index": 8,
+        "node_name": "io.appmetrica.analytics.IAppMetricaService",
+        "attention": 0.7409990275264136,
+        "normalized_attention": 0.0012543014711779237
+      },
+      {
+        "rank": 12,
+        "node_type": "intent",
+        "local_index": 16,
+        "node_name": "android.app.action.DEVICE_ADMIN_DISABLED",
+        "attention": 0.718925371998921,
+        "normalized_attention": 0.0012169370245674702
+      },
+      {
+        "rank": 13,
+        "node_type": "intent",
+        "local_index": 25,
+        "node_name": "android.intent.action.DEVICE_STORAGE_OK",
+        "attention": 0.7183296382427216,
+        "normalized_attention": 0.0012159286160553487
+      },
+      {
+        "rank": 14,
+        "node_type": "intent",
+        "local_index": 20,
+        "node_name": "android.intent.action.ACTION_POWER_CONNECTED",
+        "attention": 0.6945421351611003,
+        "normalized_attention": 0.001175663110970238
+      },
+      {
+        "rank": 15,
+        "node_type": "intent",
+        "local_index": 7,
+        "node_name": "com.huawei.push.action.MESSAGING_EVENT",
+        "attention": 0.683351768180728,
+        "normalized_attention": 0.0011567209892600963
+      },
+      {
+        "rank": 16,
+        "node_type": "package",
+        "local_index": 331,
+        "node_name": "o",
+        "attention": 0.6678346246480942,
+        "normalized_attention": 0.001130454860374026
+      },
+      {
+        "rank": 17,
+        "node_type": "intent",
+        "local_index": 19,
+        "node_name": "com.thecybernanny.adrapp.EXTRA_TIME_DECLINE",
+        "attention": 0.6256128996610641,
+        "normalized_attention": 0.0010589854389583364
+      },
+      {
+        "rank": 18,
+        "node_type": "intent",
+        "local_index": 30,
+        "node_name": "androidx.work.diagnostics.REQUEST_DIAGNOSTICS",
+        "attention": 0.6250002682209015,
+        "normalized_attention": 0.0010579484274534077
+      },
+      {
+        "rank": 19,
+        "node_type": "intent",
+        "local_index": 11,
+        "node_name": "android.intent.action.QUICKBOOT_POWERON",
+        "attention": 0.6249765742904856,
+        "normalized_attention": 0.001057908320340342
+      },
+      {
+        "rank": 20,
+        "node_type": "intent",
+        "local_index": 22,
+        "node_name": "android.intent.action.BATTERY_OKAY",
+        "attention": 0.6222389815375209,
+        "normalized_attention": 0.0010532743512122148
+      },
+      {
+        "rank": 21,
+        "node_type": "intent",
+        "local_index": 23,
+        "node_name": "android.intent.action.BATTERY_LOW",
+        "attention": 0.6053366959095001,
+        "normalized_attention": 0.0010246635690897778
+      },
+      {
+        "rank": 22,
+        "node_type": "intent",
+        "local_index": 17,
+        "node_name": "com.thecybernanny.adrapp.ACTION_PROCESS_ACTIVITY_TRANSITIONS",
+        "attention": 0.5972211584448814,
+        "normalized_attention": 0.001010926262827378
+      },
+      {
+        "rank": 23,
+        "node_type": "opcode",
+        "local_index": 207,
+        "node_name": "sget-char",
+        "attention": 0.5737819820642471,
+        "normalized_attention": 0.0009712503761861091
+      },
+      {
+        "rank": 24,
+        "node_type": "intent",
+        "local_index": 10,
+        "node_name": "com.huawei.push.msg.PASSBY_MSG",
+        "attention": 0.5715014152228832,
+        "normalized_attention": 0.0009673900224771558
+      },
+      {
+        "rank": 25,
+        "node_type": "intent",
+        "local_index": 34,
+        "node_name": "androidx.profileinstaller.action.SAVE_PROFILE",
+        "attention": 0.5677046701312065,
+        "normalized_attention": 0.0009609632084365559
+      }
+    ],
+    "top_edges": [
+      {
+        "rank": 1,
+        "source_type": "intent",
+        "source_name": "android.intent.action.TIMEZONE_CHANGED",
+        "target_type": "component",
+        "target_name": "receiver:androidx.work.impl.background.systemalarm.RescheduleReceiver",
+        "attention": 1.0
+      },
+      {
+        "rank": 2,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "ra.d",
+        "attention": 1.0
+      },
+      {
+        "rank": 3,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "w6.c",
+        "attention": 1.0
+      },
+      {
+        "rank": 4,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "Ab.h",
+        "attention": 1.0
+      },
+      {
+        "rank": 5,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "I5.G1",
+        "attention": 1.0
+      },
+      {
+        "rank": 6,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "xb.w",
+        "attention": 1.0
+      },
+      {
+        "rank": 7,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "db.e",
+        "attention": 1.0
+      },
+      {
+        "rank": 8,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "D.p",
+        "attention": 1.0
+      },
+      {
+        "rank": 9,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "B3.A",
+        "attention": 1.0
+      },
+      {
+        "rank": 10,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "Pa.c",
+        "attention": 1.0
+      },
+      {
+        "rank": 11,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "com.huawei.location.activity.RiemannSoftArService",
+        "attention": 1.0
+      },
+      {
+        "rank": 12,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "A3.H",
+        "attention": 1.0
+      },
+      {
+        "rank": 13,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "q5.S",
+        "attention": 1.0
+      },
+      {
+        "rank": 14,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "V.Q",
+        "attention": 1.0
+      },
+      {
+        "rank": 15,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "B2.X",
+        "attention": 1.0
+      },
+      {
+        "rank": 16,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "I5.t0",
+        "attention": 1.0
+      },
+      {
+        "rank": 17,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "B3.k",
+        "attention": 1.0
+      },
+      {
+        "rank": 18,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "oa.h",
+        "attention": 1.0
+      },
+      {
+        "rank": 19,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "K5.g",
+        "attention": 1.0
+      },
+      {
+        "rank": 20,
+        "source_type": "app",
+        "source_name": "com.thecybernanny.adroapp|com.thecybernanny.adroapp",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.measurement.q",
+        "attention": 1.0
+      }
+    ]
+  },
+  "caveats": [
+    "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",
+    "Graph attention indicates model focus in the graph classifier; high-attention nodes are candidates for review, not guaranteed malicious code.",
+    "Obfuscated method/class names and incomplete failed extractions can reduce interpretability.",
+    "DEX image modality is intentionally excluded from this LLM evidence packet because it is weaker and not directly behavior-interpretable.",
+    "No hard-coded API behavior labels are added; the LLM should infer API/permission/method semantics from the raw evidence."
+  ],
+  "warnings": []
+}
