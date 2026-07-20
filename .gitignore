@@ -3,3 +3,5 @@ explain/
 ensemble/
 runs/
 inference/
+.agents/
+llm_explain/

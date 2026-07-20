@@ -9,7 +9,7 @@ nohup python3 -u /home/linux/7T/lzw/projects/multimodel_malware_detection/phase2
   --input "$INPUT_DIR" \
   --output "$LOGDIR" \
   --workers 12 \
-  --info "加入类别平衡" \
+  --info "加入类别平衡,降低挑选互信息数量到4000" \
   --class-weight balanced \
   --mi-k 5000 > "$LOG" 2>&1 &
 

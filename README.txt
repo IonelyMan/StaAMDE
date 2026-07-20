@@ -107,6 +107,7 @@ python -m phase2.lightgbm.train \
   --mi-k 5000 \
   --workers 4
 ```
+互信息数量最好不要降低，保持5000
 
 输出：
 
@@ -211,17 +212,21 @@ runs/hetero_gatv2/explanations/class_attention_top.csv
 
 七、图像模态接入
 
-图像模态代码位于 `phase2/image`。训练仍按 `outputs/dex_images/train` 和 `outputs/dex_images/val` 加载图像数据；推理默认按 `outputs/dex_images/test` 输出统一 predictions.csv。
-
-推理：
-
-```bash
-python phase2/image/classify.py \
-  --data_path outputs/dex_images \
-  --belong test \
-  --eval_ckpt runs/image_model/best_final_model.pth \
-  --output runs/image_model
+图像模态代码位于 `phase2/image`，当前分类模型为 ConvNeXt V2。训练按 `outputs/dex_images/train` 和 `outputs/dex_images/val` 加载图像数据；推理默认按 `outputs/dex_images/test` 输出统一 predictions.csv。
+支持模型规格：
+```text
+convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano,
+convnextv2_tiny, convnextv2_base, convnextv2_large
 ```
+训练：
+```bash
+python -m phase2.image.train \
+  --input outputs/dex_images \
+  --output runs/image_convnextv2 \
+  --arch convnextv2_atto \
+  --image-size 224 224 \
+  --batch-size 32 \
+  --epochs 100
 
 输出：
 

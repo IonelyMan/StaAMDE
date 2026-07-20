@@ -51,15 +51,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--patience", type=int, default=12)
-    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    parser.add_argument("--device", default="cuda", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--workers", type=int, default=4, help="图文件并行加载进程数；0 表示自动，1 表示串行")
     parser.add_argument("--prefetch-factor", type=int, default=2, help="DataLoader 每个 worker 预取 batch 数")
+    parser.add_argument("--info", type=str, default="")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     run_dir = Path(args.output)
+    print("本次训练信息：",args.info)
     model_dir = run_dir / "models"
     metrics_dir = run_dir / "metrics"
     logs_dir = run_dir / "logs"
