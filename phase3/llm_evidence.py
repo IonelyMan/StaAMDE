@@ -252,6 +252,7 @@ def load_graph_evidence(
         )
 
     node_rows = [row for row in node_rows if row.get("node_type") != "app"]
+    # 排序注意力分数，降序
     node_rows = sorted(node_rows, key=lambda row: to_float(row.get("attention")), reverse=True)[:top_nodes]
     edge_rows = [row for row in edge_rows if row.get("source_node") != row.get("target_node")]
     edge_rows = sorted(edge_rows, key=lambda row: to_float(row.get("attention")), reverse=True)[:top_edges]
@@ -424,7 +425,7 @@ def build_prompt(evidence: Dict[str, object]) -> str:
             "top_positive": prompt_feature_rows(static_local.get("top_positive_features"), 10_000),
             "top_negative": prompt_feature_rows(static_local.get("top_negative_features"), 10_000),
         },
-        "static_shap_global_top": prompt_feature_rows(static_global.get("features"), 10_000),
+        # "static_shap_global_top": prompt_feature_rows(static_global.get("features"), 10_000),
         "graph_attention": {
             "top_nodes": prompt_feature_rows(graph_attention.get("top_nodes"), 10_000),
             "top_edges": prompt_edge_rows(graph_attention.get("top_edges"), 10_000),
@@ -441,10 +442,9 @@ def build_prompt(evidence: Dict[str, object]) -> str:
 1. 不要把 SHAP 或 attention 写成绝对因果证明；使用“模型关注到”“可能说明”“需要结合上下文确认”等表述。
 2. 优先解释正向 SHAP 特征、图 attention Top 节点/边；同时说明负向 SHAP 是否削弱恶意判断。
 3. 对你看得懂的 API/权限/方法名，简要解释其通常用途；对混淆名、未知名或证据不足处，明确说不确定。
-4. 如果静态证据和图证据互相支持，请总结可能行为链；如果不一致，也要指出。
-5. 输出以下小节：最终判断、关键证据解释、可能行为链、防护建议。
-6. 请给出实用防护建议，例如权限审查、网络隔离、动态沙箱验证、重点人工审计位置等。
-7. 总之结果尽量简洁，但又能解释清楚
+4. 如果判定为恶意软件则输出：最终判断、关键证据解释、可能行为、防护建议（给非专业人员)。
+5. 如果判定为良性软件则输出：最终判断、关键证据解释。
+6. 解释内容尽量简洁，但又能清楚表达。
 
 证据 JSON：
 ```json
@@ -484,7 +484,7 @@ def main() -> None:
     evidence = {
         "prediction": build_prediction_summary(sample_id, modalities),
         "static_local_shap": static_local,
-        "static_global_shap": static_global,
+        # "static_global_shap": static_global,
         "graph_attention": graph_evidence,
         "caveats": [
             "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",

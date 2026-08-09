@@ -3,7 +3,7 @@ import json
 import random
 import sys
 from pathlib import Path
-
+from tqdm import tqdm
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -26,15 +26,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=4e-5)
     parser.add_argument("--weight-decay", type=float, default=0.05)
     parser.add_argument("--drop-path-rate", type=float, default=0.1)
     parser.add_argument("--patience", type=int, default=12)
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    parser.add_argument("--device", default="cuda", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--class-weight", action="store_true", help="按训练集类别频次加权 CrossEntropy")
+    parser.add_argument("--info", type=str, default="")
+
     return parser.parse_args()
 
 
@@ -61,6 +63,7 @@ def class_weights(labels, device):
 
 def main() -> None:
     args = parse_args()
+    print("本次训练的信息：",args.info)
     seed_everything(args.seed)
     run_dir = Path(args.output)
     model_dir = run_dir / "models"
@@ -75,10 +78,11 @@ def main() -> None:
     except ImportError as exc:
         raise SystemExit("缺少 torch，请先安装 requirements.txt 中的依赖。") from exc
 
-    device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
-    if device == "auto":
-        device = "cpu"
-
+    device = "cuda:0" if args.device == "auto" and torch.cuda.is_available() else args.device
+    print("使用GPU？：",torch.cuda.is_available())
+    # if device == "auto":
+    #     device = "cpu"
+    print("[1] 正在加载数据集")
     train_dataset = DexImageDataset(Path(args.input), split="train", image_size=args.image_size, train=True)
     val_dataset = DexImageDataset(Path(args.input), split="val", image_size=args.image_size, train=False)
     train_loader = DataLoader(
@@ -95,7 +99,7 @@ def main() -> None:
         num_workers=args.workers,
         pin_memory=(device == "cuda"),
     )
-
+    print("[2] 正在创建模型")
     model = build_model(args.arch, num_classes=2, drop_path_rate=args.drop_path_rate).to(device)
     train_labels = [sample.label for sample in train_dataset.samples]
     criterion_weight = class_weights(train_labels, device) if args.class_weight else None
@@ -103,13 +107,13 @@ def main() -> None:
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(args.epochs, 1), eta_min=args.lr * 0.01)
     scaler = torch.cuda.amp.GradScaler(enabled=args.amp and device == "cuda")
-
+    print("[3] 开始训练")
     best_score = -1.0
     stale_epochs = 0
     history = []
     best_path = model_dir / "best_model.pt"
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in tqdm(range(1, args.epochs + 1),desc="正在训练中"):
         loss = train_one_epoch(model, train_loader, optimizer, criterion, device, scaler=scaler, amp=args.amp)
         val_metrics = evaluate(model, val_loader, device, args.threshold)
         score = metric_for_best_model(val_metrics, "pr_auc")

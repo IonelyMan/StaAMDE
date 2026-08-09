@@ -7,13 +7,15 @@ CODEDIR="$LOGDIR/code"
 mkdir -p "$CODEDIR"
 cp train_image.sh "$CODEDIR"
 
-python -u -m phase2.image.train \
+setsid python3 -u -m phase2.image.train \
   --input "/home/linux/7T/lzw/datasets/android_zoo/android_dex_images" \
   --output "$LOGDIR" \
-  --arch "atto" \
-  --image-size 224 224 \
+  --arch "convnextv2_nano" \
+  --image-size 512 512 \
   --batch-size 32 \
-  --epochs 100 \
-  --workers 4 2>&1 | tee "$LOG"
+  --epochs 200 \
+  --class-weight \
+  --info "使用convnextv2模型训练,尝试稍微增大模型参数" \
+  --workers 4 > "$LOG" 2>&1 &
 
 echo $$

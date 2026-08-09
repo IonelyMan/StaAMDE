@@ -20,10 +20,10 @@ from phase2.graph.reports import write_json
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="为 XAIDroid 风格 GATv2 图模型生成 attention 解释")
+    parser = argparse.ArgumentParser(description="为TA-SGATv2 图模型生成 attention 解释")
     parser.add_argument("--input", help="hetero_graphs 根目录")
     parser.add_argument("--index", help="phase1/build_heterogeneous.py 生成的 index.csv")
-    parser.add_argument("--model-path", required=True, help="训练得到的 gatv2_model.pt")
+    parser.add_argument("--model-path", required=True, help="训练TA-SGATv2得到的 gatv2_model.pt")
     parser.add_argument("--output", required=True, help="输出目录，例如 runs/hetero_gatv2")
     parser.add_argument("--split", choices=["train", "val", "test", "all"], default="test")
     parser.add_argument(
@@ -202,9 +202,10 @@ def explain_one_sample(model, sample: Dict[str, object], device, threshold: floa
 def main() -> None:
     args = parse_args()
     output_dir = Path(args.output)
-    explain_dir = output_dir / "explanations"
-    edge_dir = explain_dir / "edge_attention"
-    node_dir = explain_dir / "node_attention"
+    temp_dir = output_dir / "graph" /"explanations"
+    edge_dir = temp_dir / "edge_attention"
+    node_dir = temp_dir / "node_attention"
+    explain_dir = output_dir
     for directory in [edge_dir, node_dir]:
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -214,8 +215,8 @@ def main() -> None:
     config = checkpoint["model_config"]
     metadata = checkpoint["metadata"]
     model_type = checkpoint.get("model_type") or config.get("model_type")
-    if model_type != "gatv2":
-        raise SystemExit("当前 explain.py 只支持新 GATv2 checkpoint；旧 HGT checkpoint 没有可直接导出的 GAT attention。")
+    # if model_type != "ta-sgatv2":
+    #     raise SystemExit("当前 explain.py 只支持新 TA-SGATv2 checkpoint")
 
     device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
@@ -227,7 +228,7 @@ def main() -> None:
         config["layers"],
         config["heads"],
         config["dropout"],
-        model_type="gatv2",
+        model_type="ta-sgatv2",
         type_embedding_dim=config.get("type_embedding_dim", 16),
     ).to(device)
 
@@ -246,6 +247,7 @@ def main() -> None:
 
     requested_sample_ids = normalize_requested_sample_ids(args.sample_id)
     samples = filter_samples_by_ids(samples, requested_sample_ids)
+    # 如果没指定样本的情况下，会生成所有样本的节点/边注意力
     if len(samples) > args.max_samples and not requested_sample_ids:
         rng = random.Random(args.seed)
         samples = rng.sample(samples, args.max_samples)
@@ -311,34 +313,34 @@ def main() -> None:
         "attention",
         "normalized_attention",
     ]
-    write_rows(
-        explain_dir / "method_attention_top.csv",
-        rank_fields,
-        [
-            {key: row[key] for key in rank_fields}
-            for row in sorted(all_method_rows, key=lambda row: row["attention"], reverse=True)[: args.top_k]
-        ],
-    )
-    write_rows(
-        explain_dir / "class_attention_top.csv",
-        rank_fields,
-        [
-            {key: row[key] for key in rank_fields}
-            for row in sorted(all_class_rows, key=lambda row: row["attention"], reverse=True)[: args.top_k]
-        ],
-    )
-    write_json(
-        explain_dir / "explain_config.json",
-        {
-            "model_path": str(args.model_path),
-            "split": args.split,
-            "sample_ids": sorted(requested_sample_ids) if requested_sample_ids else None,
-            "n_samples": processed,
-            "max_samples": args.max_samples,
-            "top_k": args.top_k,
-        },
-    )
-    print(f"explanations written: {explain_dir}")
+    # write_rows(
+    #     explain_dir / f"{sample_id}" / "method_attention_top.csv",
+    #     rank_fields,
+    #     [
+    #         {key: row[key] for key in rank_fields}
+    #         for row in sorted(all_method_rows, key=lambda row: row["attention"], reverse=True)[: args.top_k]
+    #     ],
+    # )
+    # write_rows(
+    #     explain_dir / f"{sample_id}" / "class_attention_top.csv",
+    #     rank_fields,
+    #     [
+    #         {key: row[key] for key in rank_fields}
+    #         for row in sorted(all_class_rows, key=lambda row: row["attention"], reverse=True)[: args.top_k]
+    #     ],
+    # )
+    # write_json(
+    #     explain_dir / f"{sample_id}" / "explain_config.json",
+    #     {
+    #         "model_path": str(args.model_path),
+    #         "split": args.split,
+    #         "sample_ids": sorted(requested_sample_ids) if requested_sample_ids else None,
+    #         "n_samples": processed,
+    #         "max_samples": args.max_samples,
+    #         "top_k": args.top_k,
+    #     },
+    # )
+    print(f"explanations written: {temp_dir}")
 
 
 if __name__ == "__main__":
@@ -346,17 +348,17 @@ if __name__ == "__main__":
 
 """
 --sample-id com.thecybernanny.adroapp
-用法：
-python -m phase2.graph.explain \
+直到某个样本，用法：
+python3 -m phase2.graph.explain \
   --input /home/linux/7T/lzw/datasets/android_zoo/android_graphs \
-  --model-path runs/graph/07-03_15-37/models/gatv2_model.pt \
-  --output ./explain/graph \
+  --model-path runs/graph/07-03_15-37_best/models/gatv2_model.pt \
+  --output ./ml_explain \
   --split test \
-  --sample-id com.thecybernanny.adroapp
+  --sample-id com.pcsensi.app
 
 它会精确生成：
-runs/hetero_gatv2/explanations/node_attention/com.thecybernanny.adroapp.csv
-runs/hetero_gatv2/explanations/edge_attention/com.thecybernanny.adroapp.csv
+runs/hetero_gatv2/explanations/node_attention/{id}.csv
+runs/hetero_gatv2/explanations/edge_attention/{id}.csv
 
 也支持多个样本：
 python -m phase2.graph.explain \

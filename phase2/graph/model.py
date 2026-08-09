@@ -53,7 +53,7 @@ def build_hgt_model(metadata, hidden_channels: int, num_layers: int, heads: int,
     return HGTGraphClassifier()
 
 
-def build_gatv2_model(
+def build_ta_sgatv2_model(
     metadata,
     hidden_channels: int,
     num_layers: int,
@@ -72,7 +72,7 @@ def build_gatv2_model(
             node_types, edge_types = metadata
             self.node_types = list(node_types)
             self.edge_types = list(edge_types)
-            self.model_type = "gatv2"
+            self.model_type = "ta-sgatv2"
             self.dropout = dropout
             self.type_embedding_dim = type_embedding_dim if self.node_types else 0
             self.node_type_embedding = (
@@ -140,11 +140,11 @@ def build_model(
     num_layers: int,
     heads: int,
     dropout: float,
-    model_type: str = "gatv2",
+    model_type: str = "ta-sgatv2",
     type_embedding_dim: int = 16,
 ):
     if model_type == "hgt":
         return build_hgt_model(metadata, hidden_channels, num_layers, heads, dropout)
-    if model_type == "gatv2":
-        return build_gatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim)
+    if model_type == "ta-sgatv2":
+        return build_ta_sgatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim)
     raise ValueError(f"未知图模型类型: {model_type}")

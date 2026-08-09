@@ -1,4 +1,4 @@
-phase1: 数据准备
+phase1: 数据准备的几个脚本，分别有静态提取和图构建
 
 1. static_feature_extract.py
    批量提取 APK 静态文本特征，输出 static_features_report.json。保留Json文件

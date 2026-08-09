@@ -13,9 +13,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from phase3 import llm_evidence
 
 
-DEFAULT_BASE_URL = "https://ws-1t0eo80zukfizl68.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
-DEFAULT_MODEL = "qwen3.6-max-preview"
-DASHSCOPE_API_KEY = "sk-4a5af1bb2de24310a7affd1921a03c54"
+DEFAULT_BASE_URL = "https://xxx.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+DEFAULT_MODEL = "deepseek-v4-flash-0731"
+DASHSCOPE_API_KEY = "xxxx"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", default="test")
     parser.add_argument("--output", default="runs/llm_explain")
     parser.add_argument("--static-predictions", default="inference/lightgbm/predictions/test_predictions.csv")
-    parser.add_argument("--graph-predictions", default="inference/graph/predictions/test_predictions.csv")
+    parser.add_argument("--graph-predictions", default="inference/ta-sgatv2/predictions/test_predictions.csv")
     parser.add_argument("--ensemble-predictions", default="ensemble/ensemble_predictions.csv")
     parser.add_argument("--shap-reports", default="explain/lightgbm/reports")
     parser.add_argument("--graph-explain-dir", default="explain/graph/explanations")
@@ -311,10 +311,13 @@ if __name__ == "__main__":
 
 
 """
+# 需要传入对应样本的节点/边注意力目录（统一存放在ml_explain/graph/explanations下）
+# 并且需要传入对应样本的shap报告目录
+# 其余默认参数自行修改
 python3 -m phase3.aliyun_llm \
-  --sample-id com.thecybernanny.adroapp \
-  --shap-reports explain/lightgbm/reports \
-  --graph-explain-dir explain/graph/explanations \
+  --sample-id com.pcsensi.app \
+  --shap-reports ml_explain/com.pcsensi.app/reports \
+  --graph-explain-dir ml_explain/graph/explanations \
   --output ./llm_explain
 
 输出文件：

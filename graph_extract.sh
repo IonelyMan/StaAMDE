@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DATASET_ROOT="${DATASET_ROOT:-data/apks}"
-BELONG="${BELONG:-test}"
+DATASET_ROOT="${DATASET_ROOT:-YOUR_APKS_ROOT}"
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/hetero_graphs}"
-WORKERS="${WORKERS:-8}"
 
 python -u phase1/build_heterogeneous.py \
   --dataset-root "$DATASET_ROOT" \
-  --belong "$BELONG" \
+  --belong "test" \
   --output "$OUTPUT_DIR" \
-  --workers "$WORKERS"
+  --workers 8

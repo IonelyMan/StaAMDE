@@ -1,0 +1,544 @@
+{
+  "prediction": {
+    "apk_name": "com.pcsensi.app.apk",
+    "split": "test",
+    "final_prediction": "malware",
+    "final_prob_malware": 0.9983318725650374,
+    "modalities": {
+      "ensemble": {
+        "prob_malware": 0.9983318725650374,
+        "pred": "malware",
+        "source": "ensemble/ensemble_predictions.csv",
+        "prob_static": 0.9999671537528164,
+        "prob_graph": 0.9966965913772584
+      },
+      "static": {
+        "prob_malware": 0.9999671537528163,
+        "pred": "malware",
+        "source": "inference/lightgbm/predictions/test_predictions.csv"
+      },
+      "graph": {
+        "prob_malware": 0.9966965913772583,
+        "pred": "malware",
+        "source": "inference/ta-sgatv2/predictions/test_predictions.csv"
+      }
+    }
+  },
+  "static_local_shap": {
+    "available": true,
+    "source": "ml_explain/com.pcsensi.app/reports/test_com.pcsensi.app_waterfall_contributions.csv",
+    "apk_name": "com.pcsensi.app.apk",
+    "prob_malware": 0.9999671537528163,
+    "pred": 1,
+    "base_value": -3.4309521857334047,
+    "model_output": 10.323640213817798,
+    "top_positive_features": [
+      {
+        "rank": 1,
+        "feature": "api:android.view.Window.getDecorView",
+        "feature_value": "4.304065093204169",
+        "shap_value": 0.726768418892123,
+        "abs_shap_value": 0.726768418892123,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 2,
+        "feature": "api:mono.android.net.wifi.p2p.WifiP2pManager_ConnectionInfoListenerImplementor.n_onConnectionInfoAvailable",
+        "feature_value": "0.0",
+        "shap_value": 0.7264536692283147,
+        "abs_shap_value": 0.7264536692283147,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 3,
+        "feature": "api:android.graphics.drawable.GradientDrawable.<init>",
+        "feature_value": "5.003946305945459",
+        "shap_value": 0.6922706524177489,
+        "abs_shap_value": 0.6922706524177489,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 4,
+        "feature": "opcode:nop",
+        "feature_value": "7.60489448081162",
+        "shap_value": 0.6432329519197426,
+        "abs_shap_value": 0.6432329519197426,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 5,
+        "feature": "opcode:sparse-switch",
+        "feature_value": "5.638354669333745",
+        "shap_value": 0.6302272412964726,
+        "abs_shap_value": 0.6302272412964726,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 6,
+        "feature": "api:java.util.ArrayList.removeAll",
+        "feature_value": "1.791759469228055",
+        "shap_value": 0.5103659914946655,
+        "abs_shap_value": 0.5103659914946655,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 7,
+        "feature": "api:android.widget.EditText.<init>",
+        "feature_value": "1.0986122886681096",
+        "shap_value": 0.4229223090873092,
+        "abs_shap_value": 0.4229223090873092,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 8,
+        "feature": "api:java.lang.Throwable.<init>",
+        "feature_value": "3.332204510175204",
+        "shap_value": 0.39011724185267294,
+        "abs_shap_value": 0.39011724185267294,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 9,
+        "feature": "api:android.os.Bundle.putCharSequence",
+        "feature_value": "3.5263605246161616",
+        "shap_value": 0.3887066709818487,
+        "abs_shap_value": 0.3887066709818487,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 10,
+        "feature": "api:java.nio.channels.FileChannel.map",
+        "feature_value": "1.6094379124341003",
+        "shap_value": 0.33564956657131245,
+        "abs_shap_value": 0.33564956657131245,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 11,
+        "feature": "api:java.io.ByteArrayOutputStream.write",
+        "feature_value": "3.970291913552122",
+        "shap_value": 0.3164053605275666,
+        "abs_shap_value": 0.3164053605275666,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 12,
+        "feature": "api:android.content.pm.PackageManager.getActivityInfo",
+        "feature_value": "1.791759469228055",
+        "shap_value": 0.2966936211463909,
+        "abs_shap_value": 0.2966936211463909,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 13,
+        "feature": "api:java.lang.Integer.toOctalString",
+        "feature_value": "0.0",
+        "shap_value": 0.28482663003680336,
+        "abs_shap_value": 0.28482663003680336,
+        "direction": "pushes_toward_malware"
+      },
+      {
+        "rank": 15,
+        "feature": "suspicious_string:ip",
+        "feature_value": "1.0986122886681096",
+        "shap_value": 0.23332605625595668,
+        "abs_shap_value": 0.23332605625595668,
+        "direction": "pushes_toward_malware"
+      }
+    ],
+    "top_negative_features": [
+      {
+        "rank": 14,
+        "feature": "api:com.stub.StubApp.interface5",
+        "feature_value": "0.0",
+        "shap_value": -0.2388803849632692,
+        "abs_shap_value": 0.2388803849632692,
+        "direction": "pushes_toward_benign"
+      }
+    ]
+  },
+  "static_global_shap": {
+    "available": false,
+    "features": []
+  },
+  "graph_attention": {
+    "available": true,
+    "node_attention_source": "ml_explain/graph/explanations/node_attention/com.pcsensi.app.csv",
+    "edge_attention_source": "ml_explain/graph/explanations/edge_attention/com.pcsensi.app.csv",
+    "apk_name": "com.pcsensi.app.apk",
+    "prob_malware": 0.9966965913772583,
+    "pred": 1,
+    "top_nodes": [
+      {
+        "rank": 1,
+        "node_type": "intent",
+        "local_index": 0,
+        "node_name": "android.intent.action.MAIN",
+        "attention": 0.6529546754900366,
+        "normalized_attention": 0.0011766050456944526
+      },
+      {
+        "rank": 2,
+        "node_type": "opcode",
+        "local_index": 196,
+        "node_name": "ushr-long/2addr",
+        "attention": 0.5748146761325188,
+        "normalized_attention": 0.0010357990740615568
+      },
+      {
+        "rank": 3,
+        "node_type": "api",
+        "local_index": 1384,
+        "node_name": "android.graphics.Color.red",
+        "attention": 0.5413945357344275,
+        "normalized_attention": 0.0009755769678476757
+      },
+      {
+        "rank": 4,
+        "node_type": "component",
+        "local_index": 8,
+        "node_name": "activity:.DebugActivity",
+        "attention": 0.5342392997408751,
+        "normalized_attention": 0.0009626834438571629
+      },
+      {
+        "rank": 5,
+        "node_type": "api",
+        "local_index": 2172,
+        "node_name": "com.bumptech.glide.gifdecoder.GifHeaderParser.read",
+        "attention": 0.5164245851541788,
+        "normalized_attention": 0.0009305818541800807
+      },
+      {
+        "rank": 6,
+        "node_type": "package",
+        "local_index": 109,
+        "node_name": "javax.net.ssl",
+        "attention": 0.5000000000075666,
+        "normalized_attention": 0.0009009852367082193
+      },
+      {
+        "rank": 7,
+        "node_type": "package",
+        "local_index": 115,
+        "node_name": "com.bumptech.glide.load.model",
+        "attention": 0.5000000000000007,
+        "normalized_attention": 0.0009009852366945857
+      },
+      {
+        "rank": 8,
+        "node_type": "package",
+        "local_index": 138,
+        "node_name": "com.bumptech.glide.load.data",
+        "attention": 0.5000000000000001,
+        "normalized_attention": 0.0009009852366945847
+      },
+      {
+        "rank": 9,
+        "node_type": "package",
+        "local_index": 127,
+        "node_name": "com.google.android.gms.common.api",
+        "attention": 0.5,
+        "normalized_attention": 0.0009009852366945845
+      },
+      {
+        "rank": 10,
+        "node_type": "component",
+        "local_index": 3,
+        "node_name": "activity:.DisplaytesterActivity",
+        "attention": 0.4999904365763541,
+        "normalized_attention": 0.0009009680036875501
+      },
+      {
+        "rank": 11,
+        "node_type": "opcode",
+        "local_index": 191,
+        "node_name": "sput-byte",
+        "attention": 0.4985209099831991,
+        "normalized_attention": 0.0008983199601568246
+      },
+      {
+        "rank": 12,
+        "node_type": "permission",
+        "local_index": 0,
+        "node_name": "android.permission.ACCESS_NETWORK_STATE",
+        "attention": 0.48744318448007107,
+        "normalized_attention": 0.0008783582258878777
+      },
+      {
+        "rank": 13,
+        "node_type": "intent",
+        "local_index": 2,
+        "node_name": "com.pcsensi.app.START_BACKGROUND",
+        "attention": 0.4607546180486679,
+        "normalized_attention": 0.0008302662172014039
+      },
+      {
+        "rank": 14,
+        "node_type": "opcode",
+        "local_index": 174,
+        "node_name": "rem-float",
+        "attention": 0.45581335553045693,
+        "normalized_attention": 0.0008213622080423231
+      },
+      {
+        "rank": 15,
+        "node_type": "api",
+        "local_index": 1143,
+        "node_name": "android.view.View.setElevation",
+        "attention": 0.44969712932121375,
+        "normalized_attention": 0.000810340949004698
+      },
+      {
+        "rank": 16,
+        "node_type": "api",
+        "local_index": 1141,
+        "node_name": "android.view.View.setTranslationZ",
+        "attention": 0.44681814279881954,
+        "normalized_attention": 0.0008051531002980581
+      },
+      {
+        "rank": 17,
+        "node_type": "component",
+        "local_index": 4,
+        "node_name": "activity:.SpeakercleanerActivity",
+        "attention": 0.4386149719438691,
+        "normalized_attention": 0.0007903712286292709
+      },
+      {
+        "rank": 18,
+        "node_type": "component",
+        "local_index": 5,
+        "node_name": "activity:.MoreActivity",
+        "attention": 0.43269921839716646,
+        "normalized_attention": 0.0007797112154102655
+      },
+      {
+        "rank": 19,
+        "node_type": "class",
+        "local_index": 1428,
+        "node_name": "com.google.android.gms.internal.ads.zzcrq",
+        "attention": 0.43239837884902954,
+        "normalized_attention": 0.000779169111427295
+      },
+      {
+        "rank": 20,
+        "node_type": "permission",
+        "local_index": 3,
+        "node_name": "android.permission.READ_EXTERNAL_STORAGE",
+        "attention": 0.4318770170307924,
+        "normalized_attention": 0.0007782296328248792
+      },
+      {
+        "rank": 21,
+        "node_type": "component",
+        "local_index": 6,
+        "node_name": "activity:.OngameActivity",
+        "attention": 0.43025758870089303,
+        "normalized_attention": 0.0007753114707906306
+      },
+      {
+        "rank": 22,
+        "node_type": "package",
+        "local_index": 92,
+        "node_name": "com.google.android.material.datepicker",
+        "attention": 0.42857131147591876,
+        "normalized_attention": 0.0007722728490212784
+      },
+      {
+        "rank": 23,
+        "node_type": "opcode",
+        "local_index": 190,
+        "node_name": "iput-char",
+        "attention": 0.4124397869551615,
+        "normalized_attention": 0.0007432043181441203
+      },
+      {
+        "rank": 24,
+        "node_type": "class",
+        "local_index": 1481,
+        "node_name": "com.google.android.gms.internal.ads.zzdtk",
+        "attention": 0.399491550001221,
+        "normalized_attention": 0.000719871977470673
+      },
+      {
+        "rank": 25,
+        "node_type": "package",
+        "local_index": 119,
+        "node_name": "androidx.core.content.pm",
+        "attention": 0.3990898482843477,
+        "normalized_attention": 0.0007191481228377576
+      }
+    ],
+    "top_edges": [
+      {
+        "rank": 1,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "permission",
+        "target_name": "android.permission.WRITE_SETTINGS",
+        "attention": 1.0
+      },
+      {
+        "rank": 2,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "component",
+        "target_name": "activity:.OptimizeActivity",
+        "attention": 1.0
+      },
+      {
+        "rank": 3,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzdqo",
+        "attention": 1.0
+      },
+      {
+        "rank": 4,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzavp",
+        "attention": 1.0
+      },
+      {
+        "rank": 5,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzee",
+        "attention": 1.0
+      },
+      {
+        "rank": 6,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzef",
+        "attention": 1.0
+      },
+      {
+        "rank": 7,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzeo",
+        "attention": 1.0
+      },
+      {
+        "rank": 8,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzem",
+        "attention": 1.0
+      },
+      {
+        "rank": 9,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzel",
+        "attention": 1.0
+      },
+      {
+        "rank": 10,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzej",
+        "attention": 1.0
+      },
+      {
+        "rank": 11,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzen",
+        "attention": 1.0
+      },
+      {
+        "rank": 12,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzep",
+        "attention": 1.0
+      },
+      {
+        "rank": 13,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzeh",
+        "attention": 1.0
+      },
+      {
+        "rank": 14,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzei",
+        "attention": 1.0
+      },
+      {
+        "rank": 15,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzek",
+        "attention": 1.0
+      },
+      {
+        "rank": 16,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzeg",
+        "attention": 1.0
+      },
+      {
+        "rank": 17,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzbjf",
+        "attention": 1.0
+      },
+      {
+        "rank": 18,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzaeq",
+        "attention": 1.0
+      },
+      {
+        "rank": 19,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.measurement.internal.zzy",
+        "attention": 1.0
+      },
+      {
+        "rank": 20,
+        "source_type": "app",
+        "source_name": "com.pcsensi.app|com.pcsensi.app",
+        "target_type": "class",
+        "target_name": "com.google.android.gms.internal.ads.zzbjg",
+        "attention": 1.0
+      }
+    ]
+  },
+  "caveats": [
+    "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",
+    "Graph attention indicates model focus in the graph classifier; high-attention nodes are candidates for review, not guaranteed malicious code.",
+    "Obfuscated method/class names and incomplete failed extractions can reduce interpretability.",
+    "DEX image modality is intentionally excluded from this LLM evidence packet because it is weaker and not directly behavior-interpretable.",
+    "No hard-coded API behavior labels are added; the LLM should infer API/permission/method semantics from the raw evidence."
+  ],
+  "warnings": []
+}

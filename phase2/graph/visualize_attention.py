@@ -7,15 +7,18 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 """
-python -m phase2.graph.visualize_attention \
-  --run-dir explain/attention \
+explain-dir目录下要包含egde_attention和node_attention目录(即对应样本其对应的节点/边注意力权重)
+# 默认用这个,不支持多样本，要一个个生成图
+python3 -m phase2.graph.visualize_attention \
+  --explain-dir ml_explain/graph/explanations \
   --top-k-nodes 30 \
   --neighbor-hops 1 \
   --max-display-nodes 60 \
   --max-display-edges 180 \
   --circular-order spread \
-  --title "GATv2" \
-    --sample-id com.subsurfacemaps.OfflineApp
+  --title "TA-SGATv2-com.pcsensi.app" \
+  --sample-id com.pcsensi.app \
+  --output-dir ml_explain
 
 如果你想更像论文里“自然分散”的网络结构，也可以直接用力导向布局：
 python -m phase2.graph.visualize_attention \
@@ -25,6 +28,8 @@ python -m phase2.graph.visualize_attention \
   --neighbor-hops 1 \
   --max-display-nodes 60 \
   --layout spring
+
+产出ml_explain/com.thecybernanny.adroapp/attention_paper_figures/com.thecybernanny.png
 """
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +49,7 @@ def raise_csv_field_limit() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build publication-style GAT/GATv2 attention figures from graph explanation CSV files."
+        description="Build publication-style TA-SGATv2 attention figures from graph explanation CSV files."
     )
     parser.add_argument(
         "--run-dir",
@@ -57,7 +62,7 @@ def parse_args() -> argparse.Namespace:
         help="Directory containing node_attention/ and edge_attention/. Overrides --run-dir.",
     )
     parser.add_argument("--sample-id", default=None, help="Sample id to visualize. If omitted, an informative sample is chosen.")
-    parser.add_argument("--output-dir", default=None, help="Output directory. Default: <explain-dir>/paper_figures.")
+    parser.add_argument("--output-dir", default=None, help="Output directory. Default: <explain-dir>/attention_paper_figures.")
     parser.add_argument("--top-k-nodes", type=int, default=30, help="Number of most important nodes to keep before expansion.")
     parser.add_argument(
         "--neighbor-hops",
@@ -114,10 +119,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-self-loops",
         action="store_true",
-        help="Draw GAT/GATv2 self-loop attention edges. Disabled by default because they usually clutter paper figures.",
+        help="Draw TA-SGATv2 self-loop attention edges. Disabled by default because they usually clutter paper figures.",
     )
-    parser.add_argument("--title", default=None, help="Optional short title shown under the graph, for example '(b) GATv2'.")
-    parser.add_argument("--formats", nargs="+", default=["png", "pdf"], help="Output formats, for example: png pdf svg.")
+    parser.add_argument("--title", default=None, help="Optional short title shown under the graph, for example '(b) TA-SGATv2'.")
+    parser.add_argument("--formats", nargs="+", default=["png"], help="Output formats, for example: png pdf svg.")
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--seed", type=int, default=42, help="Seed used by spring layout.")
     return parser.parse_args()
@@ -576,8 +581,12 @@ def main() -> None:
     sample_id = choose_sample(explain_dir, args.sample_id)
     node_path = explain_dir / "node_attention" / f"{sample_id}.csv"
     edge_path = explain_dir / "edge_attention" / f"{sample_id}.csv"
-    output_dir = Path(args.output_dir) if args.output_dir else explain_dir / "paper_figures"
-
+    # output_dir = Path(args.output_dir) if args.output_dir else explain_dir / "attention_paper_figures"
+    if not args.output_dir:
+        print("please provide output dir")
+        exit(1)
+    else:
+        output_dir = Path(args.output_dir) / f"{sample_id}" / "attention_paper_figures"
     node_rows = read_csv_rows(node_path)
     edge_rows = read_csv_rows(edge_path)
     if not node_rows:
@@ -645,66 +654,67 @@ def main() -> None:
         seed=args.seed,
     )
 
-    write_csv_rows(
-        output_base.with_name(f"{output_base.name}_node_legend.csv"),
-        table_rows,
-        [
-            "display_id",
-            "node",
-            "node_type",
-            "local_index",
-            "node_name",
-            "attention",
-            "normalized_attention",
-            "score",
-            "is_top_k",
-            "degree_in_figure",
-            "prob_malware",
-            "y_true",
-            "pred",
-        ],
-    )
-    write_csv_rows(
-        output_base.with_name(f"{output_base.name}_edge_legend.csv"),
-        edge_table_rows,
-        [
-            "source_display_id",
-            "target_display_id",
-            "source_node",
-            "target_node",
-            "source_type",
-            "target_type",
-            "source_name",
-            "target_name",
-            "attention",
-            "edge_count",
-        ],
-    )
-    write_json(
-        output_base.with_name(f"{output_base.name}_figure_config.json"),
-        {
-            "sample_id": sample_id,
-            "node_attention_csv": str(node_path),
-            "edge_attention_csv": str(edge_path),
-            "score_column": score_column,
-            "node_types": sorted(node_types) if node_types else "all",
-            "top_k_nodes": args.top_k_nodes,
-            "neighbor_hops": args.neighbor_hops,
-            "max_display_nodes": args.max_display_nodes,
-            "max_display_edges": args.max_display_edges,
-            "min_edge_attention": args.min_edge_attention,
-            "include_self_loops": args.include_self_loops,
-            "layout": args.layout,
-            "circular_order": args.circular_order,
-            "label_mode": args.label_mode,
-            "n_display_nodes": len(display_nodes),
-            "n_display_edges": len(edges),
-            "note": (
-                "Node color is an attention-derived importance score. It explains model focus, "
-                "not a formal causal proof that the node is malicious."
-            ),
-        },
-    )
+    # write_csv_rows(
+    #     output_base.with_name(f"{output_base.name}_node_legend.csv"),
+    #     table_rows,
+    #     [
+    #         "display_id",
+    #         "node",
+    #         "node_type",
+    #         "local_index",
+    #         "node_name",
+    #         "attention",
+    #         "normalized_attention",
+    #         "score",
+    #         "is_top_k",
+    #         "degree_in_figure",
+    #         "prob_malware",
+    #         "y_true",
+    #         "pred",
+    #     ],
+    # )
+    # write_csv_rows(
+    #     output_base.with_name(f"{output_base.name}_edge_legend.csv"),
+    #     edge_table_rows,
+    #     [
+    #         "source_display_id",
+    #         "target_display_id",
+    #         "source_node",
+    #         "target_node",
+    #         "source_type",
+    #         "target_type",
+    #         "source_name",
+    #         "target_name",
+    #         "attention",
+    #         "edge_count",
+    #     ],
+    # )
+    # write_json(
+    #     output_base.with_name(f"{output_base.name}_figure_config.json"),
+    #     {
+    #         "sample_id": sample_id,
+    #         "node_attention_csv": str(node_path),
+    #         "edge_attention_csv": str(edge_path),
+    #         "score_column": score_column,
+    #         "node_types": sorted(node_types) if node_types else "all",
+    #         "top_k_nodes": args.top_k_nodes,
+    #         "neighbor_hops": args.neighbor_hops,
+    #         "max_display_nodes": args.max_display_nodes,
+    #         "max_display_edges": args.max_display_edges,
+    #         "min_edge_attention": args.min_edge_attention,
+    #         "include_self_loops": args.include_self_loops,
+    #         "layout": args.layout,
+    #         "circular_order": args.circular_order,
+    #         "label_mode": args.label_mode,
+    #         "n_display_nodes": len(display_nodes),
+    #         "n_display_edges": len(edges),
+    #         "note": (
+    #             "Node color is an attention-derived importance score. It explains model focus, "
+    #             "not a formal causal proof that the node is malicious."
+    #         ),
+    #     },
+    # )
+    # 无用存储文件
 
     figure_paths = [str(output_base.with_suffix(f".{fmt.lower().lstrip('.')}")) for fmt in args.formats]
     print(f"sample_id: {sample_id}")

@@ -487,7 +487,7 @@ def write_rows(path: Path, fieldnames: Sequence[str], rows: Sequence[Dict[str, o
 
 def main() -> None:
     args = parse_args()
-    reports_dir = Path(args.output) / "reports"
+    reports_dir = Path(args.output)
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     input_dir = resolve_split_input(Path(args.input), args.split)
@@ -562,7 +562,7 @@ def main() -> None:
     waterfall_sample_id = None
     waterfall_position = None
     if not args.no_plots:
-        figures_dir = reports_dir / "shap_figures"
+        figures_dir = reports_dir / "shap_paper_figures"
         if generate_global_outputs and mean_abs is not None:
             summary_top_indices = np.argsort(mean_abs)[::-1][: max(1, args.summary_plot_top_k)]
             summary_feature_values = feature_values_subset(X, summary_top_indices)
@@ -630,7 +630,7 @@ def main() -> None:
                 }
             )
         write_rows(
-            reports_dir / f"{suffix}_{safe_filename(waterfall_sample_id)}_waterfall_contributions.csv",
+            reports_dir / "reports" / f"{suffix}_{safe_filename(waterfall_sample_id)}_waterfall_contributions.csv",
             [
                 "sample_key",
                 "sample_id",
@@ -678,7 +678,7 @@ def main() -> None:
         "waterfall_position": int(waterfall_position) if waterfall_position is not None else None,
         "note": "Native LightGBM SHAP values explain the malware-class raw score/log-odds; positive values push the sample toward malware.",
     }
-    (reports_dir / f"{suffix}_shap_figure_config.json").write_text(
+    (reports_dir / "reports" / f"{suffix}_shap_figure_config.json").write_text(
         json.dumps(config, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -699,18 +699,27 @@ if __name__ == "__main__":
 runs/static_lgbm/reports/test_shap_summary.csv
 
 # 每个featrue在横轴有很多点，往左点数越多表示这个featrue更让模型觉得是良性，往右则是恶意
-runs/static_lgbm/reports/shap_figures/test_shap_summary_beeswarm.png/pdf
+ml_explain/lightgbm/reports/test_shap_summary.csv
 
 # 模型整体最依赖哪些特征，全局 Feature Importance；柱子越长说明这个Feature越重要。
-runs/static_lgbm/reports/shap_figures/test_top20_mean_abs_shap_bar.png/pdf  
+ml_explain/lightgbm/test_top20_mean_abs_shap_bar.png  
 
 # 解释为什么这个APK会被判成恶意，不同APK有不同的TOP-K特征。同一个Feature对于不同APK会有时是正，有时是负
-runs/static_lgbm/reports/shap_figures/test_<sample_id>_waterfall.png/pdf
-runs/static_lgbm/reports/test_<sample_id>_waterfall_contributions.csv
-runs/static_lgbm/reports/test_shap_figure_config.json
+ml_explain/{id}/shap_paper_figures/{id}.png
 
-推荐命令：
-python -m phase2.lightgbm.explain \
+大约执行三分钟
+# 默认命令：如果要指定 APK（作为样例演示）：
+python3 -m phase2.lightgbm.explain \
+  --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
+  --model-dir runs/lightgbm/07-04_12-58_best/models \
+  --output ml_explain/com.pcsensi.app \
+  --split test \
+  --waterfall-sample-id com.pcsensi.app
+而且不只是跳过画图，我还改了计算逻辑：指定 --waterfall-sample-id 时默认只对这个 APK 计算 SHAP，不再对 --max-samples 800 里的所有样本算一遍，所以速度会明显快。
+
+
+默认挑选预测概率最大的那个样本来展示：
+python3 -m phase2.lightgbm.explain \
   --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
   --model-dir runs/lightgbm/07-04_12-58/models \
   --output explain/ligthgbm \
@@ -721,25 +730,15 @@ python -m phase2.lightgbm.explain \
   --bar-top-k 20 \
   --waterfall-top-k 15
 
-大约执行三分钟
-如果要指定 waterfall 的 APK：
-python -m phase2.lightgbm.explain \
-  --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
-  --model-dir runs/lightgbm/07-04_12-58/models \
-  --output explain/lightgbm \
-  --split test \
-  --waterfall-sample-id com.thecybernanny.adroapp
 
-它会默认只生成这个样本的：
-runs/static_lgbm/reports/test_com.thecybernanny.adroapp_waterfall_contributions.csv
-runs/static_lgbm/reports/shap_figures/test_com.thecybernanny.adroapp_waterfall.png
-不会再重复生成：
+上述命令默认只生成这个样本的：
+..../reports/test_com.thecybernanny.adroapp_waterfall_contributions.csv
+..../reports/shap_figures/test_com.thecybernanny.adroapp_waterfall.png
+
+生成全局的一些东西需要加上--include-global-plots：
 test_shap_summary_beeswarm.png
 test_top20_mean_abs_shap_bar.png
-而且不只是跳过画图，我还改了计算逻辑：指定 --waterfall-sample-id 时默认只对这个 APK 计算 SHAP，不再对 --max-samples 800 里的所有样本算一遍，所以速度会明显快。
 
-如果你确实想在指定样本时也重新生成全局图，再加：
---include-global-plots
 
 实现细节也补好了：
 beeswarm：优先用标准 shap.summary_plot；如果环境没有 shap 绘图能力，会自动退回内置 beeswarm-style，不会中断。

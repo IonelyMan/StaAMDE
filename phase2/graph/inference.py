@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="使用已训练图模型进行推理")
     parser.add_argument("--input", help="hetero_graphs 根目录")
     parser.add_argument("--index", help="phase1/build_heterogeneous.py 生成的 index.csv")
-    parser.add_argument("--model-path", required=True, help="训练得到的 gatv2_model.pt 或 hgt_model.pt")
+    parser.add_argument("--model-path", required=True, help="训练TA-SGATv2得到的 gatv2_model.pt 或 hgt_model.pt")
     parser.add_argument("--output", required=True, help="推理输出目录，例如 runs/hetero_gatv2")
     parser.add_argument("--split", choices=["train", "val", "test", "all"], default="test")
     parser.add_argument("--batch-size", type=int, default=8)
