@@ -458,7 +458,7 @@ def plot_waterfall(
             f" {value:+.4g}",
             va="center",
             ha="left" if value >= 0 else "right",
-            fontsize=8,
+            fontsize=16,
             color=color,
         )
 
@@ -466,12 +466,12 @@ def plot_waterfall(
     ax.axvline(base_value, color="#666666", linestyle="--", linewidth=1.0, label=f"E[f(x)]={base_value:.4g}")
     ax.axvline(final_value, color="#111111", linewidth=1.1, label=f"f(x)={final_value:.4g}")
     ax.set_yticks(y_positions)
-    ax.set_yticklabels([short_feature_name(str(row["feature"])) for row in display_rows])
+    ax.set_yticklabels([short_feature_name(str(row["feature"])) for row in display_rows],fontsize=16)
     ax.invert_yaxis()
-    ax.set_xlabel("Model output for malware class (log-odds)")
-    ax.set_title(f"SHAP Waterfall: {sample_id} | p_malware={prob:.4f}, y={y_true}, pred={pred}")
+    ax.set_xlabel("Model output for malware class (log-odds)",fontsize=16)
+    ax.set_title(f"SHAP Waterfall: {sample_id} | p_malware={prob:.4f}, y={y_true}, pred={pred}",fontsize=16)
     ax.grid(axis="x", color="#dddddd", linewidth=0.6, alpha=0.8)
-    ax.legend(loc="best", fontsize=8)
+    ax.legend(loc="best", fontsize=16)
     paths = save_figure(fig, output_base, formats, dpi)
     plt.close(fig)
     return paths
@@ -712,9 +712,9 @@ ml_explain/{id}/shap_paper_figures/{id}.png
 python3 -m phase2.lightgbm.explain \
   --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
   --model-dir runs/lightgbm/07-04_12-58_best/models \
-  --output ml_explain/com.pcsensi.app \
+  --output ml_explain/com.socialapps.homeplus \
   --split test \
-  --waterfall-sample-id com.pcsensi.app
+  --waterfall-sample-id com.socialapps.homeplus
 而且不只是跳过画图，我还改了计算逻辑：指定 --waterfall-sample-id 时默认只对这个 APK 计算 SHAP，不再对 --max-samples 800 里的所有样本算一遍，所以速度会明显快。
 
 

@@ -215,8 +215,8 @@ def main() -> None:
     config = checkpoint["model_config"]
     metadata = checkpoint["metadata"]
     model_type = checkpoint.get("model_type") or config.get("model_type")
-    # if model_type != "ta-sgatv2":
-    #     raise SystemExit("当前 explain.py 只支持新 TA-SGATv2 checkpoint")
+    # if model_type != "tasgatv2":
+    #     raise SystemExit("当前 explain.py 只支持新 TASGATv2 checkpoint")
 
     device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
@@ -228,7 +228,7 @@ def main() -> None:
         config["layers"],
         config["heads"],
         config["dropout"],
-        model_type="ta-sgatv2",
+        model_type="tasgatv2",
         type_embedding_dim=config.get("type_embedding_dim", 16),
     ).to(device)
 

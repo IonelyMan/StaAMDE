@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", default="test")
     parser.add_argument("--output", default="runs/llm_explain")
     parser.add_argument("--static-predictions", default="inference/lightgbm/predictions/test_predictions.csv")
-    parser.add_argument("--graph-predictions", default="inference/ta-sgatv2/predictions/test_predictions.csv")
+    parser.add_argument("--graph-predictions", default="inference/tasgatv2/predictions/test_predictions.csv")
     parser.add_argument("--ensemble-predictions", default="ensemble/ensemble_predictions.csv")
     parser.add_argument("--shap-reports", default="explain/lightgbm/reports")
     parser.add_argument("--graph-explain-dir", default="explain/graph/explanations")

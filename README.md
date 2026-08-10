@@ -80,7 +80,7 @@ outputs/
 训练阶段：
 
 - LightGBM 训练只读取 `outputs/static_reports/train` 和 `outputs/static_reports/val`。
-- TA-SGATv2 图模型训练只读取 `outputs/hetero_graphs/train` 和 `outputs/hetero_graphs/val`；根目录模式会根据目录名强制赋值 split，不依赖原始 JSON 或 index.csv 里的 split 字段。
+- TASGATv2 图模型训练只读取 `outputs/hetero_graphs/train` 和 `outputs/hetero_graphs/val`；根目录模式会根据目录名强制赋值 split，不依赖原始 JSON 或 index.csv 里的 split 字段。
 - train/val 不要求三个模态样本完全一致，因为它们只是分别训练各自模型。
 - 如果没有 train/val 子目录，代码才会回退到旧逻辑：扫描输入根目录并按已有 split 或随机切分。
 
@@ -171,7 +171,7 @@ python -m phase2.graph.train \
   --output runs/hetero_gatv2 \
   --epochs 60 \
   --batch-size 8 \
-  --model-type ta-sgatv2 \
+  --model-type tasgatv2 \
   --workers 4
 ```
 
@@ -190,7 +190,7 @@ HGT 训练每轮使用验证集 PR AUC 判断并保存最佳模型权重。
 python3 -m phase2.graph.inference \
   --input /home/linux/7T/lzw/datasets/android_zoo/android_graphs \
   --model-path runs/graph/08-04_11-16_zero/models/gatv2_model.pt \
-  --output inference/ta-sgatv2 \
+  --output inference/tasgatv2 \
   --split test
 ```
 
@@ -226,7 +226,7 @@ python3 -m phase2.graph.visualize_attention \
   --max-display-nodes 60 \
   --max-display-edges 180 \
   --circular-order spread \
-  --title "TA-SGATv2-com.pcsensi.app" \
+  --title "TASGATv2-com.pcsensi.app" \
   --sample-id com.pcsensi.app \
   --output-dir ml_explain
 ```
@@ -272,7 +272,7 @@ test:1:sample001,sample001,sample001.apk,test,1,0.932,1
 ```bash
 python ensemble_predict.py \
   --input static=inference/lightgbm/predictions/test_predictions.csv \
-  --input graph=inference/ta-sgatv2/predictions/test_predictions.csv \
+  --input graph=inference/tasgatv2/predictions/test_predictions.csv \
   --output ensemble \
   --tune-weights \
   --tune-threshold

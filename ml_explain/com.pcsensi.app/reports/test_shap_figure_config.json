@@ -10,7 +10,7 @@
   "plots_enabled": true,
   "figure_outputs": {
     "waterfall": [
-      "ml_explain/com.pcsensi.app/reports/shap_figures/test_com.pcsensi.png"
+      "ml_explain/com.pcsensi.app/shap_paper_figures/test_com.pcsensi.png"
     ]
   },
   "waterfall_sample_id": "com.pcsensi.app",

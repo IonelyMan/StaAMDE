@@ -20,7 +20,7 @@
       "graph": {
         "prob_malware": 0.9966965913772583,
         "pred": "malware",
-        "source": "inference/ta-sgatv2/predictions/test_predictions.csv"
+        "source": "inference/tasgatv2/predictions/test_predictions.csv"
       }
     }
   },

@@ -3,23 +3,17 @@
   "model_dir": "runs/lightgbm/07-04_12-58_best/models",
   "split": "test",
   "method": "native",
-  "n_samples": 456,
+  "n_samples": 1,
   "max_samples": 800,
-  "summary_csv": "ml_explain/lightgbm/reports/test_shap_summary.csv",
-  "global_outputs_generated": true,
+  "summary_csv": null,
+  "global_outputs_generated": false,
   "plots_enabled": true,
   "figure_outputs": {
-    "summary_beeswarm": [
-      "ml_explain/lightgbm/reports/shap_figures/test_shap_summary_beeswarm.png"
-    ],
-    "top_mean_abs_bar": [
-      "ml_explain/lightgbm/reports/shap_figures/test_top20_mean_abs_shap_bar.png"
-    ],
     "waterfall": [
-      "ml_explain/lightgbm/reports/shap_figures/test_com.thecybernanny.png"
+      "ml_explain/com.thecybernanny.adroapp/shap_paper_figures/test_com.thecybernanny.png"
     ]
   },
   "waterfall_sample_id": "com.thecybernanny.adroapp",
-  "waterfall_position": 414,
+  "waterfall_position": 0,
   "note": "Native LightGBM SHAP values explain the malware-class raw score/log-odds; positive values push the sample toward malware."
 }

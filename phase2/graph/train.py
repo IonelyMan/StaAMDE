@@ -32,7 +32,7 @@ def dataloader_kwargs(worker_count: int, prefetch_factor: int) -> dict:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="训练 TA-SGATv2 图分类器")
+    parser = argparse.ArgumentParser(description="训练 TASGATv2 图分类器")
     parser.add_argument("--input", help="hetero_graphs 根目录；若存在 train/val 子目录，训练只读取这两个 split")
     parser.add_argument("--index", help="phase1/build_heterogeneous.py 生成的 index.csv")
     parser.add_argument("--output", required=True, help="训练运行目录，例如 runs/hetero_gatv2")
@@ -42,8 +42,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--layers", type=int, default=2)
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--dropout", type=float, default=0.25)
-    parser.add_argument("--model-type", default="ta-sgatv2", choices=["ta-sgatv2", "hgt"])
-    parser.add_argument("--type-embedding-dim", type=int, default=16, help="TA-SGATv2 同构图中的节点类型嵌入维度，0则退化为标准GATv2")
+    parser.add_argument("--model-type", default="tasgatv2", choices=["tasgatv2", "hgt"])
+    parser.add_argument("--type-embedding-dim", type=int, default=16, help="TASGATv2 同构图中的节点类型嵌入维度，0则退化为标准GATv2")
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--test-size", type=float, default=0.2)

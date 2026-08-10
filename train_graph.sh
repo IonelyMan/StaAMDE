@@ -9,7 +9,7 @@ INPUT_DIR="/home/linux/7T/lzw/datasets/android_zoo/android_graphs"
 nohup python3 -u ./phase2/graph/train.py \
   --batch-size 8 \
   --input "$INPUT_DIR" \
-  --model-type "ta-sgatv2" \
+  --model-type "tasgatv2" \
   --workers 12 \
   --type-embedding-dim 0 \
   --info "测试改名后训练是否成功" \

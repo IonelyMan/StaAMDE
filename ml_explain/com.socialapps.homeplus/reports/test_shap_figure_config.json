@@ -10,10 +10,10 @@
   "plots_enabled": true,
   "figure_outputs": {
     "waterfall": [
-      "ml_explain/org.ooma.oomaapp/shap_paper_figures/test_org.ooma.png"
+      "ml_explain/com.socialapps.homeplus/shap_paper_figures/test_com.socialapps.png"
     ]
   },
-  "waterfall_sample_id": "org.ooma.oomaapp",
+  "waterfall_sample_id": "com.socialapps.homeplus",
   "waterfall_position": 0,
   "note": "Native LightGBM SHAP values explain the malware-class raw score/log-odds; positive values push the sample toward malware."
 }

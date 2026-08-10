@@ -16,8 +16,8 @@ python3 -m phase2.graph.visualize_attention \
   --max-display-nodes 60 \
   --max-display-edges 180 \
   --circular-order spread \
-  --title "TA-SGATv2-com.pcsensi.app" \
-  --sample-id com.pcsensi.app \
+  --title "TASGATv2-org.ooma.oomaapp" \
+  --sample-id org.ooma.oomaapp \
   --output-dir ml_explain
 
 如果你想更像论文里“自然分散”的网络结构，也可以直接用力导向布局：
@@ -49,7 +49,7 @@ def raise_csv_field_limit() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build publication-style TA-SGATv2 attention figures from graph explanation CSV files."
+        description="Build publication-style TASGATv2 attention figures from graph explanation CSV files."
     )
     parser.add_argument(
         "--run-dir",
@@ -119,12 +119,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-self-loops",
         action="store_true",
-        help="Draw TA-SGATv2 self-loop attention edges. Disabled by default because they usually clutter paper figures.",
+        help="Draw TASGATv2 self-loop attention edges. Disabled by default because they usually clutter paper figures.",
     )
-    parser.add_argument("--title", default=None, help="Optional short title shown under the graph, for example '(b) TA-SGATv2'.")
+    parser.add_argument("--title", default=None, help="Optional short title shown under the graph, for example '(b) TASGATv2'.")
     parser.add_argument("--formats", nargs="+", default=["png"], help="Output formats, for example: png pdf svg.")
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--seed", type=int, default=42, help="Seed used by spring layout.")
+    parser.add_argument(
+        "--node-font-size",
+        type=float,
+        default=16.0,
+        help="Font size of node rank/id labels. Values above 12 may overflow small nodes.",
+    )
+    parser.add_argument(
+        "--info-font-size",
+        type=float,
+        default=16.0,
+        help="Font size of the prediction summary shown above the graph.",
+    )
     return parser.parse_args()
 
 
@@ -458,6 +470,14 @@ def build_edge_table_rows(
     return rows
 
 
+def class_label(value: int) -> str:
+    if value == 1:
+        return "Malware"
+    if value == 0:
+        return "Benign"
+    return "Unknown"
+
+
 def plot_attention_graph(
     output_base: Path,
     formats: Sequence[str],
@@ -470,6 +490,11 @@ def plot_attention_graph(
     label_mode: str,
     title: Optional[str],
     score_label: str,
+    prob_malware: float,
+    y_true: int,
+    pred: int,
+    node_font_size: float,
+    info_font_size: float,
     dpi: int,
     seed: int,
 ) -> None:
@@ -515,6 +540,31 @@ def plot_attention_graph(
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
     ax.set_axis_off()
 
+    true_name = class_label(y_true)
+    pred_name = class_label(pred)
+    if y_true in {0, 1} and pred in {0, 1}:
+        correctness = "Correct" if y_true == pred else "Incorrect"
+    else:
+        correctness = "Label unavailable"
+    summary = (
+        f"P(malware) = {prob_malware:.2%}   |   "
+        f"True: {true_name} ({y_true})   |   "
+        f"Predicted: {pred_name} ({pred})   |   {correctness}"
+    )
+    summary_edge = "#3A7D44" if y_true == pred and y_true in {0, 1} else "#B03A2E"
+    fig.suptitle(
+        summary,
+        fontsize=info_font_size,
+        fontweight="semibold",
+        y=0.985,
+        bbox={
+            "boxstyle": "round,pad=0.38",
+            "facecolor": "#F7F7F7",
+            "edgecolor": summary_edge,
+            "linewidth": 1.2,
+        },
+    )
+
     for (src, dst, data), width, alpha in zip(graph.edges(data=True), edge_widths, edge_alphas):
         nx.draw_networkx_edges(
             graph,
@@ -557,13 +607,15 @@ def plot_attention_graph(
                 label,
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=node_font_size,
+                fontweight="semibold",
                 color=font_color,
                 zorder=10,
             )
 
     colorbar = fig.colorbar(node_collection, ax=ax, fraction=0.046, pad=0.04)
-    colorbar.set_label(score_label)
+    colorbar.set_label(score_label, fontsize=16)
+    colorbar.ax.tick_params(labelsize=10)
 
     if title:
         fig.text(0.5, 0.02, title, ha="center", va="bottom", fontsize=18, family="serif")
@@ -634,9 +686,11 @@ def main() -> None:
     title = args.title
     output_base = output_dir / safe_filename(sample_id)
 
-    score_label = "GAT Node Attention"
+    score_label = "TASGATv2 Node Attention"
     if score_column == "normalized_attention":
-        score_label = "Normalized GAT Node Attention"
+        score_label = "Normalized TASGATv2 Node Attention"
+
+    sample_metadata = next(iter(nodes.values()))
 
     plot_attention_graph(
         output_base=output_base,
@@ -650,6 +704,11 @@ def main() -> None:
         circular_order=args.circular_order,
         title=title,
         score_label=score_label,
+        prob_malware=float(sample_metadata["prob_malware"]),
+        y_true=int(sample_metadata["y_true"]),
+        pred=int(sample_metadata["pred"]),
+        node_font_size=args.node_font_size,
+        info_font_size=args.info_font_size,
         dpi=args.dpi,
         seed=args.seed,
     )
