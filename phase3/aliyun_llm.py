@@ -5,7 +5,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-
+# 配置文件
+from config import DEFAULT_BASE_URL,DEFAULT_MODEL, DASHSCOPE_API_KEY
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -13,9 +14,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from phase3 import llm_evidence
 
 
-DEFAULT_BASE_URL = "https://xxx.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
-DEFAULT_MODEL = "deepseek-v4-flash-0731"
-DASHSCOPE_API_KEY = "xxxx"
+# DEFAULT_BASE_URL = "https://ws-1t0eo80zukfizl68.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+# DEFAULT_MODEL = "deepseek-v4-flash-0731"
+# DASHSCOPE_API_KEY = "sk-e9d9636f75474486ac89cb25422e3659"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(

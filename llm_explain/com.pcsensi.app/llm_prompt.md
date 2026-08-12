@@ -169,176 +169,176 @@
         "rank": 1,
         "type": "intent",
         "name": "android.intent.action.MAIN",
-        "attention": 0.6529546754900366,
-        "normalized_attention": 0.0011766050456944526
+        "attention": 0.6529546605888754,
+        "normalized_attention": 0.001176605008755002
       },
       {
         "rank": 2,
         "type": "opcode",
         "name": "ushr-long/2addr",
-        "attention": 0.5748146761325188,
-        "normalized_attention": 0.0010357990740615568
+        "attention": 0.5748146655387245,
+        "normalized_attention": 0.001035799046091099
       },
       {
         "rank": 3,
         "type": "api",
         "name": "android.graphics.Color.red",
-        "attention": 0.5413945357344275,
-        "normalized_attention": 0.0009755769678476757
+        "attention": 0.5413945357397708,
+        "normalized_attention": 0.0009755769594928843
       },
       {
         "rank": 4,
         "type": "component",
         "name": "activity:.DebugActivity",
-        "attention": 0.5342392997408751,
-        "normalized_attention": 0.0009626834438571629
+        "attention": 0.5342393306054873,
+        "normalized_attention": 0.0009626834912204092
       },
       {
         "rank": 5,
         "type": "api",
         "name": "com.bumptech.glide.gifdecoder.GifHeaderParser.read",
-        "attention": 0.5164245851541788,
-        "normalized_attention": 0.0009305818541800807
+        "attention": 0.5164245752200713,
+        "normalized_attention": 0.0009305818283004727
       },
       {
         "rank": 6,
         "type": "package",
         "name": "javax.net.ssl",
         "attention": 0.5000000000075666,
-        "normalized_attention": 0.0009009852367082193
+        "normalized_attention": 0.0009009852289833354
       },
       {
         "rank": 7,
         "type": "package",
         "name": "com.bumptech.glide.load.model",
         "attention": 0.5000000000000007,
-        "normalized_attention": 0.0009009852366945857
+        "normalized_attention": 0.0009009852289697018
       },
       {
         "rank": 8,
         "type": "package",
         "name": "com.bumptech.glide.load.data",
         "attention": 0.5000000000000001,
-        "normalized_attention": 0.0009009852366945847
+        "normalized_attention": 0.0009009852289697008
       },
       {
         "rank": 9,
         "type": "package",
         "name": "com.google.android.gms.common.api",
         "attention": 0.5,
-        "normalized_attention": 0.0009009852366945845
+        "normalized_attention": 0.0009009852289697006
       },
       {
         "rank": 10,
         "type": "component",
         "name": "activity:.DisplaytesterActivity",
-        "attention": 0.4999904365763541,
-        "normalized_attention": 0.0009009680036875501
+        "attention": 0.4999904366318333,
+        "normalized_attention": 0.0009009679960627858
       },
       {
         "rank": 11,
         "type": "opcode",
         "name": "sput-byte",
-        "attention": 0.4985209099831991,
-        "normalized_attention": 0.0008983199601568246
+        "attention": 0.49852091004140675,
+        "normalized_attention": 0.0008983199525596807
       },
       {
         "rank": 12,
         "type": "permission",
         "name": "android.permission.ACCESS_NETWORK_STATE",
-        "attention": 0.48744318448007107,
-        "normalized_attention": 0.0008783582258878777
+        "attention": 0.4874431248754263,
+        "normalized_attention": 0.0008783581109511846
       },
       {
         "rank": 13,
         "type": "intent",
         "name": "com.pcsensi.app.START_BACKGROUND",
         "attention": 0.4607546180486679,
-        "normalized_attention": 0.0008302662172014039
+        "normalized_attention": 0.000830266210082852
       },
       {
         "rank": 14,
         "type": "opcode",
         "name": "rem-float",
-        "attention": 0.45581335553045693,
-        "normalized_attention": 0.0008213622080423231
+        "attention": 0.4558132859528996,
+        "normalized_attention": 0.0008213620756234097
       },
       {
         "rank": 15,
         "type": "api",
         "name": "android.view.View.setElevation",
-        "attention": 0.44969712932121375,
-        "normalized_attention": 0.000810340949004698
+        "attention": 0.449697161607054,
+        "normalized_attention": 0.000810341000235112
       },
       {
         "rank": 16,
         "type": "api",
         "name": "android.view.View.setTranslationZ",
-        "attention": 0.44681814279881954,
-        "normalized_attention": 0.0008051531002980581
+        "attention": 0.44681812789764574,
+        "normalized_attention": 0.0008051530665433466
       },
       {
         "rank": 17,
         "type": "component",
         "name": "activity:.SpeakercleanerActivity",
-        "attention": 0.4386149719438691,
-        "normalized_attention": 0.0007903712286292709
+        "attention": 0.4386149756691594,
+        "normalized_attention": 0.0007903712285656345
       },
       {
         "rank": 18,
         "type": "component",
         "name": "activity:.MoreActivity",
-        "attention": 0.43269921839716646,
-        "normalized_attention": 0.0007797112154102655
+        "attention": 0.43269917369368294,
+        "normalized_attention": 0.0007797111281708063
       },
       {
         "rank": 19,
         "type": "class",
         "name": "com.google.android.gms.internal.ads.zzcrq",
-        "attention": 0.43239837884902954,
-        "normalized_attention": 0.000779169111427295
+        "attention": 0.4323984781901042,
+        "normalized_attention": 0.0007791692837565222
       },
       {
         "rank": 20,
         "type": "permission",
         "name": "android.permission.READ_EXTERNAL_STORAGE",
-        "attention": 0.4318770170307924,
-        "normalized_attention": 0.0007782296328248792
+        "attention": 0.4318769723273088,
+        "normalized_attention": 0.0007782295455981227
       },
       {
         "rank": 21,
         "type": "component",
         "name": "activity:.OngameActivity",
-        "attention": 0.43025758870089303,
-        "normalized_attention": 0.0007753114707906306
+        "attention": 0.4302575961514735,
+        "normalized_attention": 0.0007753114775689767
       },
       {
         "rank": 22,
         "type": "package",
         "name": "com.google.android.material.datepicker",
-        "attention": 0.42857131147591876,
-        "normalized_attention": 0.0007722728490212784
+        "attention": 0.42857131147556454,
+        "normalized_attention": 0.0007722728423993128
       },
       {
         "rank": 23,
         "type": "opcode",
         "name": "iput-char",
-        "attention": 0.4124397869551615,
-        "normalized_attention": 0.0007432043181441203
+        "attention": 0.4124398257602575,
+        "normalized_attention": 0.0007432043816976581
       },
       {
         "rank": 24,
         "type": "class",
         "name": "com.google.android.gms.internal.ads.zzdtk",
-        "attention": 0.399491550001221,
-        "normalized_attention": 0.000719871977470673
+        "attention": 0.3994915201988891,
+        "normalized_attention": 0.0007198719175956998
       },
       {
         "rank": 25,
         "type": "package",
         "name": "androidx.core.content.pm",
-        "attention": 0.3990898482843477,
-        "normalized_attention": 0.0007191481228377576
+        "attention": 0.3990898482326884,
+        "normalized_attention": 0.0007191481165788236
       }
     ],
     "top_edges": [

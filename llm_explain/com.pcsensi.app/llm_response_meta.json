@@ -1,18 +1,18 @@
 {
   "sample_id": "com.pcsensi.app",
   "model": "deepseek-v4-flash-0731",
-  "base_url": "https://xxx.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
-  "elapsed_seconds": 19.17988920211792,
-  "input_tokens_estimated": 4867,
+  "base_url": "https://ws-1t0eo80zukfizl68.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "elapsed_seconds": 17.29003095626831,
+  "input_tokens_estimated": 4866,
   "input_token_count_method": "tiktoken_estimate",
   "provider_usage": {
-    "completion_tokens": 1431,
-    "prompt_tokens": 4897,
-    "total_tokens": 6328,
+    "completion_tokens": 1557,
+    "prompt_tokens": 4896,
+    "total_tokens": 6453,
     "completion_tokens_details": {
       "accepted_prediction_tokens": null,
       "audio_tokens": null,
-      "reasoning_tokens": 365,
+      "reasoning_tokens": 285,
       "rejected_prediction_tokens": null
     },
     "prompt_tokens_details": {

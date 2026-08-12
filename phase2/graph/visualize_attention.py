@@ -16,8 +16,8 @@ python3 -m phase2.graph.visualize_attention \
   --max-display-nodes 60 \
   --max-display-edges 180 \
   --circular-order spread \
-  --title "TASGATv2-org.ooma.oomaapp" \
-  --sample-id org.ooma.oomaapp \
+  --title "TASGATv2-com.pcsensi.app" \
+  --sample-id com.pcsensi.app \
   --output-dir ml_explain
 
 如果你想更像论文里“自然分散”的网络结构，也可以直接用力导向布局：
