@@ -1,4 +1,4 @@
 *.pyc
 runs/
 ml_explain/graph/explanations/
-.config
+config.py
