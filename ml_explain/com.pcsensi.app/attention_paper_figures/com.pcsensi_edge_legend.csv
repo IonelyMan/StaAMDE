@@ -1,0 +1,16 @@
+source_display_id,target_display_id,source_node,target_node,source_type,target_type,source_name,target_name,attention,edge_count
+26,8,6873,7117,api,package,com.bumptech.glide.load.data.DataFetcher$DataCallback.onLoadFailed,com.bumptech.glide.load.data,1.0,2
+23,8,6874,7117,api,package,com.bumptech.glide.load.data.DataFetcher$DataCallback.onDataReady,com.bumptech.glide.load.data,1.0,2
+5,20,6973,7121,api,package,com.bumptech.glide.gifdecoder.GifHeaderParser.read,com.bumptech.glide.gifdecoder,0.9271857738494873,2
+22,1,10,21,component,intent,activity:.MainActivity,android.intent.action.MAIN,0.6273843050003052,2
+19,13,20,23,component,intent,service:com.pcsensi.app.backgroundService,com.pcsensi.app.START_BACKGROUND,0.5864198803901672,2
+25,9,6700,7106,api,package,com.google.android.gms.common.api.Status.<init>,com.google.android.gms.common.api,0.5,4
+28,8,6918,7117,api,package,com.bumptech.glide.load.data.DataFetcher.cleanup,com.bumptech.glide.load.data,0.5,4
+24,7,6497,7094,api,package,com.bumptech.glide.load.model.ModelLoader.buildLoadData,com.bumptech.glide.load.model,0.5,4
+21,22,0,10,app,component,com.pcsensi.app|com.pcsensi.app,activity:.MainActivity,0.27868008613586426,2
+21,18,0,15,app,component,com.pcsensi.app|com.pcsensi.app,activity:.MoreActivity,0.2692033052444458,2
+21,17,0,14,app,component,com.pcsensi.app|com.pcsensi.app,activity:.SpeakercleanerActivity,0.2455400675535202,2
+21,12,0,1,app,permission,com.pcsensi.app|com.pcsensi.app,android.permission.ACCESS_NETWORK_STATE,0.16249869763851166,2
+21,4,0,18,app,component,com.pcsensi.app|com.pcsensi.app,activity:.DebugActivity,0.13769619166851044,2
+21,10,0,13,app,component,com.pcsensi.app|com.pcsensi.app,activity:.DisplaytesterActivity,4.686380998464301e-05,2
+27,6,6430,7088,api,package,javax.net.ssl.SSLSocketFactory.createSocket,javax.net.ssl,2.981953572955831e-11,2

@@ -1,26 +1,35 @@
 import argparse
 import csv
+import json
 import math
 import sys
-import textwrap
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-"""Create a compact, publication-ready view of TASGATv2 attention.
-
+"""
+explain-dir目录下要包含egde_attention和node_attention目录(即对应样本其对应的节点/边注意力权重)
+# 默认用这个,不支持多样本，要一个个生成图
 python3 -m phase2.graph.visualize_attention \
   --explain-dir ml_explain/graph/explanations \
-  --sample-id com.pcsensi.app \
-  --output-dir ml_explain \
+  --top-k-nodes 30 \
+  --neighbor-hops 1 \
+  --max-display-nodes 60 \
+  --max-display-edges 180 \
+  --circular-order spread \
   --title "TASGATv2-com.pcsensi.app" \
-  --formats png
+  --sample-id com.pcsensi.app \
+  --output-dir ml_explain
 
-The explanation directory must contain ``node_attention/`` and
-``edge_attention/`` CSV files produced by :mod:`phase2.graph.explain`.
+如果你想更像论文里“自然分散”的网络结构，也可以直接用力导向布局：
+python -m phase2.graph.visualize_attention \
+  --run-dir runs/hetero_gatv2 \
+  --sample-id sample001 \
+  --top-k-nodes 30 \
+  --neighbor-hops 1 \
+  --max-display-nodes 60 \
+  --layout spring
 
-GAT attention is non-negative: it describes where the model looked, not
-whether a node contributes positively to malware or benign evidence. The
-figure therefore uses hue for the predicted class and intensity for attention.
+产出ml_explain/com.thecybernanny.adroapp/attention_paper_figures/com.thecybernanny.png
 """
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +63,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--sample-id", default=None, help="Sample id to visualize. If omitted, an informative sample is chosen.")
     parser.add_argument("--output-dir", default=None, help="Output directory. Default: <explain-dir>/attention_paper_figures.")
-    parser.add_argument("--top-k-nodes", type=int, default=18, help="Number of most important nodes to keep before expansion.")
+    parser.add_argument("--top-k-nodes", type=int, default=30, help="Number of most important nodes to keep before expansion.")
     parser.add_argument(
         "--neighbor-hops",
         type=int,
@@ -64,10 +73,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-display-nodes",
         type=int,
-        default=28,
+        default=60,
         help="Maximum nodes in the final figure after neighbor expansion.",
     )
-    parser.add_argument("--max-display-edges", type=int, default=45, help="Maximum edges in the final figure.")
+    parser.add_argument("--max-display-edges", type=int, default=180, help="Maximum edges in the final figure.")
     parser.add_argument(
         "--score-column",
         choices=["auto", "attention", "normalized_attention"],
@@ -76,9 +85,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--layout",
-        choices=["circular", "spring", "kamada"],
-        default="spring",
-        help="Figure layout. Spring is the clearest default for the sparse attention subgraph.",
+        choices=["circular", "spring"],
+        default="circular",
+        help="Figure layout. Circular is usually clearer for paper-style overview figures.",
     )
     parser.add_argument(
         "--circular-order",
@@ -91,15 +100,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--label-mode",
-        choices=["top", "rank", "node_id", "none"],
-        default="top",
-        help="Text shown inside nodes. 'top' labels only the highest-ranked nodes listed in the side panel.",
-    )
-    parser.add_argument(
-        "--label-top-n",
-        type=int,
-        default=8,
-        help="Number of ranked nodes labelled when --label-mode top is used.",
+        choices=["rank", "node_id", "none"],
+        default="rank",
+        help="Text shown inside nodes. The mapping table is always saved.",
     )
     parser.add_argument(
         "--node-types",
@@ -114,29 +117,9 @@ def parse_args() -> argparse.Namespace:
         help="Drop edges with attention below this value before drawing.",
     )
     parser.add_argument(
-        "--edge-quantile",
-        type=float,
-        default=0.70,
-        help="Keep edges at or above this within-subgraph attention quantile (0 disables quantile filtering).",
-    )
-    parser.add_argument(
         "--include-self-loops",
         action="store_true",
         help="Draw TASGATv2 self-loop attention edges. Disabled by default because they usually clutter paper figures.",
-    )
-    parser.add_argument(
-        "--show-edge-directions",
-        action="store_true",
-        help="Show directed arrows. By default reciprocal edges are merged into cleaner undirected relations.",
-    )
-    parser.add_argument(
-        "--attention-scale",
-        choices=["absolute", "relative"],
-        default="absolute",
-        help=(
-            "Color scale for nodes. Absolute uses a fixed comparable scale (0-1 for raw attention); "
-            "relative emphasizes rank within a sample."
-        ),
     )
     parser.add_argument("--title", default=None, help="Optional short title shown under the graph, for example '(b) TASGATv2'.")
     parser.add_argument("--formats", nargs="+", default=["png"], help="Output formats, for example: png pdf svg.")
@@ -145,13 +128,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--node-font-size",
         type=float,
-        default=9.0,
+        default=16.0,
         help="Font size of node rank/id labels. Values above 12 may overflow small nodes.",
     )
     parser.add_argument(
         "--info-font-size",
         type=float,
-        default=11.0,
+        default=16.0,
         help="Font size of the prediction summary shown above the graph.",
     )
     return parser.parse_args()
@@ -187,6 +170,11 @@ def write_csv_rows(path: Path, rows: Sequence[Dict[str, object]], fieldnames: Se
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def write_json(path: Path, payload: Dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def to_float(value: object, default: float = 0.0) -> float:
@@ -324,9 +312,7 @@ def expand_top_nodes(
     max_display_nodes: int,
 ) -> Tuple[Set[int], Set[int]]:
     ranked_nodes = sorted(nodes, key=lambda node_id: float(nodes[node_id]["score"]), reverse=True)
-    node_budget = max(max_display_nodes, 1)
-    effective_top_k = min(max(top_k, 1), node_budget)
-    top_nodes = set(ranked_nodes[:effective_top_k])
+    top_nodes = set(ranked_nodes[: max(top_k, 1)])
     display_nodes = set(top_nodes)
     frontier = set(top_nodes)
 
@@ -349,7 +335,7 @@ def expand_top_nodes(
             break
 
     if len(display_nodes) > max_display_nodes:
-        top_keep = set(ranked_nodes[: min(len(ranked_nodes), effective_top_k)])
+        top_keep = set(ranked_nodes[: min(len(ranked_nodes), top_k)])
         remaining = [node_id for node_id in ranked_nodes if node_id in display_nodes and node_id not in top_keep]
         display_nodes = top_keep | set(remaining[: max(0, max_display_nodes - len(top_keep))])
 
@@ -360,9 +346,6 @@ def aggregate_edges(
     edges: Sequence[Dict[str, object]],
     display_nodes: Set[int],
     max_display_edges: int,
-    edge_quantile: float = 0.0,
-    directed: bool = False,
-    focus_nodes: Optional[Set[int]] = None,
 ) -> List[Dict[str, object]]:
     pair_to_edge: Dict[Tuple[int, int], Dict[str, object]] = {}
     for edge in edges:
@@ -370,67 +353,16 @@ def aggregate_edges(
         dst = int(edge["target_node"])
         if src not in display_nodes or dst not in display_nodes:
             continue
-        key = (src, dst) if directed else tuple(sorted((src, dst)))
+        key = (src, dst)
         current = pair_to_edge.get(key)
         if current is None:
-            merged = dict(edge, edge_count=1)
-            merged["source_node"], merged["target_node"] = key
-            pair_to_edge[key] = merged
+            pair_to_edge[key] = dict(edge, edge_count=1)
         else:
             current["edge_count"] = int(current.get("edge_count", 1)) + 1
             current["attention"] = max(float(current["attention"]), float(edge["attention"]))
 
-    candidates = sorted(pair_to_edge.values(), key=lambda item: float(item["attention"]), reverse=True)
-    if not candidates or max_display_edges <= 0:
-        return []
-
-    quantile = min(max(edge_quantile, 0.0), 1.0)
-    values = sorted(float(edge["attention"]) for edge in candidates)
-    if quantile > 0.0 and len(values) > 1:
-        position = quantile * (len(values) - 1)
-        lower = int(math.floor(position))
-        upper = int(math.ceil(position))
-        fraction = position - lower
-        threshold = values[lower] * (1.0 - fraction) + values[upper] * fraction
-    else:
-        threshold = -math.inf
-
-    # Preserve one strong relation for each focus node before filling the
-    # remaining budget. This avoids a sparse figure made of isolated Top-K nodes.
-    selected: List[Dict[str, object]] = []
-    selected_pairs: Set[Tuple[int, int]] = set()
-    focus = focus_nodes or set()
-    for node_id in focus:
-        incident = next(
-            (
-                edge
-                for edge in candidates
-                if node_id in {int(edge["source_node"]), int(edge["target_node"])}
-            ),
-            None,
-        )
-        if incident is None:
-            continue
-        pair = (int(incident["source_node"]), int(incident["target_node"]))
-        if pair not in selected_pairs:
-            selected.append(incident)
-            selected_pairs.add(pair)
-
-    selected.sort(key=lambda item: float(item["attention"]), reverse=True)
-    selected = selected[:max_display_edges]
-    selected_pairs = {
-        (int(edge["source_node"]), int(edge["target_node"])) for edge in selected
-    }
-    for edge in candidates:
-        if len(selected) >= max_display_edges:
-            break
-        pair = (int(edge["source_node"]), int(edge["target_node"]))
-        if pair in selected_pairs or float(edge["attention"]) < threshold:
-            continue
-        selected.append(edge)
-        selected_pairs.add(pair)
-
-    return sorted(selected, key=lambda item: float(item["attention"]), reverse=True)
+    selected = sorted(pair_to_edge.values(), key=lambda item: float(item["attention"]), reverse=True)
+    return selected[: max_display_edges]
 
 
 def display_rank_map(nodes: Dict[int, Dict[str, object]], display_nodes: Iterable[int]) -> Dict[int, int]:
@@ -480,14 +412,6 @@ def safe_filename(text: str) -> str:
         else:
             keep.append("_")
     return "".join(keep).strip("_") or "sample"
-
-
-def output_stem(sample_id: str) -> str:
-    """Keep historical short APK figure names without truncating unknown IDs."""
-    parts = sample_id.split(".")
-    if len(parts) >= 3 and all(parts[:2]):
-        return safe_filename(".".join(parts[:-1]))
-    return safe_filename(sample_id)
 
 
 def build_table_rows(
@@ -554,19 +478,6 @@ def class_label(value: int) -> str:
     return "Unknown"
 
 
-def compact_node_name(value: object, width: int = 34) -> str:
-    """Keep long Android identifiers readable in the side panel."""
-    text = str(value or "unknown").replace("\n", " ").strip()
-    if len(text) <= width:
-        return text
-    parts = [part for part in text.replace("/", ".").split(".") if part]
-    if parts:
-        tail = parts[-1]
-        if len(tail) <= width - 3:
-            return f"...{tail}"
-    return textwrap.shorten(text, width=width, placeholder="...")
-
-
 def plot_attention_graph(
     output_base: Path,
     formats: Sequence[str],
@@ -577,11 +488,8 @@ def plot_attention_graph(
     layout: str,
     circular_order: str,
     label_mode: str,
-    label_top_n: int,
     title: Optional[str],
     score_label: str,
-    attention_scale: str,
-    show_edge_directions: bool,
     prob_malware: float,
     y_true: int,
     pred: int,
@@ -595,9 +503,6 @@ def plot_attention_graph(
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        from matplotlib.cm import ScalarMappable
-        from matplotlib.colors import LinearSegmentedColormap, Normalize, PowerNorm
-        from matplotlib.lines import Line2D
         import networkx as nx
     except ImportError as exc:
         raise SystemExit(
@@ -605,7 +510,7 @@ def plot_attention_graph(
             "Install them with: pip install matplotlib networkx"
         ) from exc
 
-    graph = nx.DiGraph() if show_edge_directions else nx.Graph()
+    graph = nx.DiGraph()
     ordered_nodes = sorted(display_nodes, key=lambda node_id: rank_map[node_id])
     layout_nodes = circular_node_order(nodes, display_nodes, rank_map, circular_order)
     for node_id in layout_nodes:
@@ -613,75 +518,27 @@ def plot_attention_graph(
     for edge in edges:
         graph.add_edge(int(edge["source_node"]), int(edge["target_node"]), attention=float(edge["attention"]))
 
-    if layout == "circular":
+    if layout == "spring":
+        pos = nx.spring_layout(graph, seed=seed, k=1.2 / math.sqrt(max(graph.number_of_nodes(), 1)), iterations=200)
+    else:
         pos = nx.circular_layout(graph)
-    elif layout == "kamada":
-        try:
-            pos = nx.kamada_kawai_layout(graph)
-        except ImportError:
-            pos = nx.spring_layout(
-                graph,
-                seed=seed,
-                k=1.65 / math.sqrt(max(graph.number_of_nodes(), 1)),
-                iterations=300,
-            )
-    else:
-        pos = nx.spring_layout(
-            graph,
-            seed=seed,
-            k=1.65 / math.sqrt(max(graph.number_of_nodes(), 1)),
-            iterations=300,
-        )
 
-    raw_scores = {node_id: max(float(nodes[node_id]["score"]), 0.0) for node_id in ordered_nodes}
-    if attention_scale == "relative":
-        count = max(len(ordered_nodes) - 1, 1)
-        color_scores = {node_id: 1.0 - ((rank_map[node_id] - 1) / count) for node_id in ordered_nodes}
-        colorbar_label = "Within-sample attention rank"
-        color_norm = Normalize(vmin=0.0, vmax=1.0)
-    else:
-        color_scores = raw_scores
-        colorbar_label = score_label
-        # Attention coefficients are bounded by 0 and 1. A fixed scale makes
-        # different sample figures comparable; gamma only improves low-value visibility.
-        color_norm = PowerNorm(gamma=0.55, vmin=0.0, vmax=1.0)
-
-    size_count = max(len(ordered_nodes) - 1, 1)
-    sizes = {
-        node_id: 330.0 + 720.0 * (1.0 - ((rank_map[node_id] - 1) / size_count)) ** 1.35
-        for node_id in ordered_nodes
-    }
+    scores = [float(nodes[node_id]["score"]) for node_id in ordered_nodes]
+    max_score = max(scores) if scores else 1.0
+    min_score = min(scores) if scores else 0.0
+    if math.isclose(max_score, min_score):
+        min_score = 0.0
+    sizes = [360.0 + 980.0 * (score / max(max_score, 1e-12)) for score in scores]
 
     edge_weights = [float(data.get("attention", 0.0)) for _, _, data in graph.edges(data=True)]
     max_edge = max(edge_weights) if edge_weights else 1.0
-    edge_widths = [0.45 + 2.35 * (value / max(max_edge, 1e-12)) ** 0.8 for value in edge_weights]
-    edge_alphas = [0.16 + 0.46 * (value / max(max_edge, 1e-12)) ** 0.8 for value in edge_weights]
+    edge_widths = [0.35 + 2.2 * (value / max(max_edge, 1e-12)) for value in edge_weights]
+    edge_alphas = [0.18 + 0.42 * (value / max(max_edge, 1e-12)) for value in edge_weights]
 
-    if pred == 1:
-        accent = "#B4232C"
-        pale = "#FFF4F2"
-        cmap = LinearSegmentedColormap.from_list(
-            "malware_attention", ["#FFF7F5", "#F8B7AD", "#DF665D", "#B4232C", "#72111A"]
-        )
-    elif pred == 0:
-        accent = "#1769A6"
-        pale = "#F1F8FD"
-        cmap = LinearSegmentedColormap.from_list(
-            "benign_attention", ["#F7FBFF", "#C6E2F2", "#6BAED6", "#2171B5", "#084A7B"]
-        )
-    else:
-        accent = "#69508F"
-        pale = "#F7F4FA"
-        cmap = LinearSegmentedColormap.from_list(
-            "unknown_attention", ["#FAF8FC", "#D8CDE5", "#9B7EB8", "#60427F"]
-        )
-
-    fig = plt.figure(figsize=(11.8, 7.0), facecolor="white")
-    grid = fig.add_gridspec(1, 2, width_ratios=[3.35, 1.35], wspace=0.035)
-    ax = fig.add_subplot(grid[0, 0])
-    info_ax = fig.add_subplot(grid[0, 1])
+    fig_width = 8.8 if graph.number_of_nodes() <= 45 else 10.5
+    fig_height = 7.6 if graph.number_of_nodes() <= 45 else 9.0
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
     ax.set_axis_off()
-    info_ax.set_axis_off()
 
     true_name = class_label(y_true)
     pred_name = class_label(pred)
@@ -689,36 +546,24 @@ def plot_attention_graph(
         correctness = "Correct" if y_true == pred else "Incorrect"
     else:
         correctness = "Label unavailable"
-    summary = f"Predicted {pred_name}  |  P(malware) {prob_malware:.2%}"
+    summary = (
+        f"P(malware) = {prob_malware:.2%}   |   "
+        f"True: {true_name} ({y_true})   |   "
+        f"Predicted: {pred_name} ({pred})   |   {correctness}"
+    )
     summary_edge = "#3A7D44" if y_true == pred and y_true in {0, 1} else "#B03A2E"
-    fig.text(
-        0.035,
-        0.955,
+    fig.suptitle(
         summary,
-        ha="left",
-        va="center",
-        fontsize=info_font_size + 2,
+        fontsize=info_font_size,
         fontweight="semibold",
+        y=0.985,
         bbox={
-            "boxstyle": "round,pad=0.42",
-            "facecolor": pale,
-            "edgecolor": accent,
-            "linewidth": 1.3,
+            "boxstyle": "round,pad=0.38",
+            "facecolor": "#F7F7F7",
+            "edgecolor": summary_edge,
+            "linewidth": 1.2,
         },
     )
-    fig.text(
-        0.965,
-        0.955,
-        f"True {true_name}  |  {correctness}",
-        ha="right",
-        va="center",
-        fontsize=info_font_size,
-        color=summary_edge,
-        fontweight="semibold",
-    )
-
-    figure_title = title or str(next(iter(nodes.values())).get("sample_id") or "Attention explanation")
-    ax.set_title(figure_title, loc="left", fontsize=12.0, fontweight="semibold", color="#202124", pad=8)
 
     for (src, dst, data), width, alpha in zip(graph.edges(data=True), edge_widths, edge_alphas):
         nx.draw_networkx_edges(
@@ -726,39 +571,35 @@ def plot_attention_graph(
             pos,
             ax=ax,
             edgelist=[(src, dst)],
-            arrows=show_edge_directions,
+            arrows=True,
             arrowstyle="-|>",
-            arrowsize=9,
+            arrowsize=8,
             width=width,
-            edge_color="#66717A",
+            edge_color="#444444",
             alpha=alpha,
-            connectionstyle="arc3,rad=0.06" if show_edge_directions else "arc3",
+            connectionstyle="arc3,rad=0.08",
         )
 
-    marker_cycle = ["o", "s", "D", "^", "h", "v", "P", "X"]
-    node_types = sorted({str(nodes[node_id]["node_type"]) for node_id in ordered_nodes})
-    type_markers = {node_type: marker_cycle[index % len(marker_cycle)] for index, node_type in enumerate(node_types)}
-    for node_type in node_types:
-        group = [node_id for node_id in ordered_nodes if str(nodes[node_id]["node_type"]) == node_type]
-        nx.draw_networkx_nodes(
-            graph,
-            pos,
-            ax=ax,
-            nodelist=group,
-            node_color=[cmap(color_norm(color_scores[node_id])) for node_id in group],
-            node_size=[sizes[node_id] for node_id in group],
-            node_shape=type_markers[node_type],
-            linewidths=1.15,
-            edgecolors="white",
-        )
+    node_collection = nx.draw_networkx_nodes(
+        graph,
+        pos,
+        ax=ax,
+        nodelist=ordered_nodes,
+        node_color=scores,
+        cmap=plt.cm.Reds,
+        vmin=min_score,
+        vmax=max_score,
+        node_size=sizes,
+        linewidths=0.8,
+        edgecolors="#333333",
+    )
 
     if label_mode != "none":
+        midpoint = min_score + (max_score - min_score) * 0.62
         for node_id in ordered_nodes:
-            if label_mode == "top" and rank_map[node_id] > max(label_top_n, 0):
-                continue
             label = str(node_id) if label_mode == "node_id" else str(rank_map[node_id])
-            normalized_color = float(color_norm(color_scores[node_id]))
-            font_color = "white" if normalized_color >= 0.56 else "#202124"
+            score = float(nodes[node_id]["score"])
+            font_color = "white" if score >= midpoint else "#111111"
             x_coord, y_coord = pos[node_id]
             ax.text(
                 x_coord,
@@ -767,125 +608,22 @@ def plot_attention_graph(
                 ha="center",
                 va="center",
                 fontsize=node_font_size,
-                fontweight="bold",
+                fontweight="semibold",
                 color=font_color,
                 zorder=10,
             )
 
-    scalar = ScalarMappable(norm=color_norm, cmap=cmap)
-    scalar.set_array([])
-    colorbar = fig.colorbar(scalar, ax=ax, orientation="horizontal", fraction=0.055, pad=0.055, shrink=0.74, aspect=35)
-    colorbar.set_label(colorbar_label, fontsize=9.5, color="#374151")
-    colorbar.ax.tick_params(labelsize=8, colors="#4B5563")
-    colorbar.outline.set_edgecolor("#9CA3AF")
+    colorbar = fig.colorbar(node_collection, ax=ax, fraction=0.046, pad=0.04)
+    colorbar.set_label(score_label, fontsize=16)
+    colorbar.ax.tick_params(labelsize=10)
 
-    # Compact explanatory panel: names make rank labels interpretable without
-    # drawing long Android identifiers on top of the network.
-    info_ax.text(0.03, 0.965, "Top attended nodes", transform=info_ax.transAxes, fontsize=12, fontweight="bold", va="top")
-    top_for_panel = ordered_nodes[: min(8, len(ordered_nodes))]
-    panel_y = 0.905
-    for node_id in top_for_panel:
-        node = nodes[node_id]
-        marker = type_markers[str(node["node_type"])]
-        info_ax.scatter(
-            [0.055],
-            [panel_y],
-            s=70,
-            marker=marker,
-            c=[cmap(color_norm(color_scores[node_id]))],
-            edgecolors="white",
-            linewidths=0.8,
-            transform=info_ax.transAxes,
-            clip_on=False,
-        )
-        info_ax.text(
-            0.105,
-            panel_y + 0.012,
-            f"{rank_map[node_id]:>2}  {compact_node_name(node['node_name'])}",
-            transform=info_ax.transAxes,
-            fontsize=8.4,
-            fontweight="semibold",
-            va="center",
-            color="#202124",
-        )
-        info_ax.text(
-            0.105,
-            panel_y - 0.018,
-            f"{node['node_type']}  |  attention {raw_scores[node_id]:.3f}",
-            transform=info_ax.transAxes,
-            fontsize=7.2,
-            va="center",
-            color="#6B7280",
-        )
-        panel_y -= 0.083
-
-    all_scores = sorted((max(float(node["score"]), 0.0) for node in nodes.values()), reverse=True)
-    score_total = sum(all_scores)
-    top5_share = sum(all_scores[:5]) / score_total if score_total > 0 else 0.0
-    divider_y = max(panel_y + 0.01, 0.19)
-    info_ax.plot([0.03, 0.97], [divider_y, divider_y], transform=info_ax.transAxes, color="#E5E7EB", linewidth=1.0)
-    info_ax.text(0.03, divider_y - 0.045, "Attention profile", transform=info_ax.transAxes, fontsize=9.5, fontweight="bold")
-    info_ax.text(
-        0.03,
-        divider_y - 0.09,
-        f"Top-5 share   {top5_share:.1%}\nShown         {len(ordered_nodes)} / {len(nodes)} nodes\nRelations     {graph.number_of_edges()}",
-        transform=info_ax.transAxes,
-        fontsize=8.2,
-        linespacing=1.55,
-        va="top",
-        color="#374151",
-    )
-
-    legend_handles = [
-        Line2D(
-            [0],
-            [0],
-            marker=type_markers[node_type],
-            color="none",
-            markerfacecolor="#9CA3AF",
-            markeredgecolor="white",
-            markersize=7.5,
-            label=node_type,
-        )
-        for node_type in node_types[:5]
-    ]
-    if legend_handles:
-        info_ax.text(
-            0.56,
-            divider_y - 0.045,
-            "Node types",
-            transform=info_ax.transAxes,
-            fontsize=9.5,
-            fontweight="bold",
-        )
-        info_ax.legend(
-            handles=legend_handles,
-            loc="upper left",
-            bbox_to_anchor=(0.53, divider_y - 0.07),
-            frameon=False,
-            fontsize=7.5,
-            ncol=2 if len(legend_handles) > 2 else 1,
-            handletextpad=0.35,
-            columnspacing=0.8,
-        )
-
-    fig.text(
-        0.035,
-        0.025,
-        "Hue = predicted class  |  intensity = attention  |  size = within-sample rank.  "
-        "Node score is mean incident-edge attention; it is unsigned, not a positive/negative class contribution.",
-        ha="left",
-        va="bottom",
-        fontsize=8.2,
-        color="#5F6368",
-    )
-    fig.subplots_adjust(top=0.88, bottom=0.105, left=0.035, right=0.98)
+    if title:
+        fig.text(0.5, 0.02, title, ha="center", va="bottom", fontsize=18, family="serif")
 
     output_base.parent.mkdir(parents=True, exist_ok=True)
     for fmt in formats:
         clean_fmt = fmt.lower().lstrip(".")
-        figure_path = output_base.with_name(f"{output_base.name}.{clean_fmt}")
-        fig.savefig(figure_path, dpi=dpi, bbox_inches="tight", facecolor="white")
+        fig.savefig(output_base.with_suffix(f".{clean_fmt}"), dpi=dpi, bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
 
@@ -895,11 +633,12 @@ def main() -> None:
     sample_id = choose_sample(explain_dir, args.sample_id)
     node_path = explain_dir / "node_attention" / f"{sample_id}.csv"
     edge_path = explain_dir / "edge_attention" / f"{sample_id}.csv"
-    output_dir = (
-        Path(args.output_dir) / sample_id / "attention_paper_figures"
-        if args.output_dir
-        else explain_dir / "attention_paper_figures"
-    )
+    # output_dir = Path(args.output_dir) if args.output_dir else explain_dir / "attention_paper_figures"
+    if not args.output_dir:
+        print("please provide output dir")
+        exit(1)
+    else:
+        output_dir = Path(args.output_dir) / f"{sample_id}" / "attention_paper_figures"
     node_rows = read_csv_rows(node_path)
     edge_rows = read_csv_rows(edge_path)
     if not node_rows:
@@ -933,14 +672,7 @@ def main() -> None:
         neighbor_hops=args.neighbor_hops,
         max_display_nodes=args.max_display_nodes,
     )
-    edges = aggregate_edges(
-        edges,
-        display_nodes,
-        args.max_display_edges,
-        edge_quantile=args.edge_quantile,
-        directed=args.show_edge_directions,
-        focus_nodes=display_nodes,
-    )
+    edges = aggregate_edges(edges, display_nodes, args.max_display_edges)
 
     degree = {node_id: 0 for node_id in display_nodes}
     for edge in edges:
@@ -952,7 +684,7 @@ def main() -> None:
     edge_table_rows = build_edge_table_rows(edges, nodes, rank_map)
 
     title = args.title
-    output_base = output_dir / output_stem(sample_id)
+    output_base = output_dir / safe_filename(sample_id)
 
     score_label = "TASGATv2 Node Attention"
     if score_column == "normalized_attention":
@@ -969,12 +701,9 @@ def main() -> None:
         rank_map=rank_map,
         layout=args.layout,
         label_mode=args.label_mode,
-        label_top_n=args.label_top_n,
         circular_order=args.circular_order,
         title=title,
         score_label=score_label,
-        attention_scale=args.attention_scale,
-        show_edge_directions=args.show_edge_directions,
         prob_malware=float(sample_metadata["prob_malware"]),
         y_true=int(sample_metadata["y_true"]),
         pred=int(sample_metadata["pred"]),
@@ -984,41 +713,41 @@ def main() -> None:
         seed=args.seed,
     )
 
-    write_csv_rows(
-        output_base.with_name(f"{output_base.name}_node_legend.csv"),
-        table_rows,
-        [
-            "display_id",
-            "node",
-            "node_type",
-            "local_index",
-            "node_name",
-            "attention",
-            "normalized_attention",
-            "score",
-            "is_top_k",
-            "degree_in_figure",
-            "prob_malware",
-            "y_true",
-            "pred",
-        ],
-    )
-    write_csv_rows(
-        output_base.with_name(f"{output_base.name}_edge_legend.csv"),
-        edge_table_rows,
-        [
-            "source_display_id",
-            "target_display_id",
-            "source_node",
-            "target_node",
-            "source_type",
-            "target_type",
-            "source_name",
-            "target_name",
-            "attention",
-            "edge_count",
-        ],
-    )
+    # write_csv_rows(
+    #     output_base.with_name(f"{output_base.name}_node_legend.csv"),
+    #     table_rows,
+    #     [
+    #         "display_id",
+    #         "node",
+    #         "node_type",
+    #         "local_index",
+    #         "node_name",
+    #         "attention",
+    #         "normalized_attention",
+    #         "score",
+    #         "is_top_k",
+    #         "degree_in_figure",
+    #         "prob_malware",
+    #         "y_true",
+    #         "pred",
+    #     ],
+    # )
+    # write_csv_rows(
+    #     output_base.with_name(f"{output_base.name}_edge_legend.csv"),
+    #     edge_table_rows,
+    #     [
+    #         "source_display_id",
+    #         "target_display_id",
+    #         "source_node",
+    #         "target_node",
+    #         "source_type",
+    #         "target_type",
+    #         "source_name",
+    #         "target_name",
+    #         "attention",
+    #         "edge_count",
+    #     ],
+    # )
     # write_json(
     #     output_base.with_name(f"{output_base.name}_figure_config.json"),
     #     {
@@ -1044,12 +773,9 @@ def main() -> None:
     #         ),
     #     },
     # )
-    # 部分文件没有保留的必要
+    # 无用存储文件
 
-    figure_paths = [
-        str(output_base.with_name(f"{output_base.name}.{fmt.lower().lstrip('.')}"))
-        for fmt in args.formats
-    ]
+    figure_paths = [str(output_base.with_suffix(f".{fmt.lower().lstrip('.')}")) for fmt in args.formats]
     print(f"sample_id: {sample_id}")
     print(f"figures: {', '.join(figure_paths)}")
     print(f"node legend: {output_base.with_name(f'{output_base.name}_node_legend.csv')}")
@@ -1058,4 +784,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
