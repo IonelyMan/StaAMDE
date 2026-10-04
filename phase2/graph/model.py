@@ -1,3 +1,12 @@
+def normalize_checkpoint_model_type(value: object) -> str:
+    """Map current and earlier GATv2 checkpoint identifiers to ATGATv2."""
+    if value == "hgt":
+        return "hgt"
+    if isinstance(value, str) and value.lower().endswith("gatv2"):
+        return "atgatv2"
+    raise ValueError(f"未知图模型类型: {value}")
+
+
 def build_hgt_model(metadata, hidden_channels: int, num_layers: int, heads: int, dropout: float):
     import torch.nn.functional as F
     from torch import nn
@@ -53,7 +62,7 @@ def build_hgt_model(metadata, hidden_channels: int, num_layers: int, heads: int,
     return HGTGraphClassifier()
 
 
-def build_tasgatv2_model(
+def build_atgatv2_model(
     metadata,
     hidden_channels: int,
     num_layers: int,
@@ -66,13 +75,13 @@ def build_tasgatv2_model(
     from torch import nn
     from torch_geometric.nn import GATv2Conv, Linear, global_mean_pool
 
-    class XAIDroidGATv2Classifier(nn.Module):
+    class ATGATv2Classifier(nn.Module):
         def __init__(self):
             super().__init__()
             node_types, edge_types = metadata
             self.node_types = list(node_types)
             self.edge_types = list(edge_types)
-            self.model_type = "tasgatv2"
+            self.model_type = "atgatv2"
             self.dropout = dropout
             self.type_embedding_dim = type_embedding_dim if self.node_types else 0
             self.node_type_embedding = (
@@ -131,7 +140,7 @@ def build_tasgatv2_model(
                 return logits, attention_weights
             return logits
 
-    return XAIDroidGATv2Classifier()
+    return ATGATv2Classifier()
 
 
 def build_model(
@@ -140,11 +149,11 @@ def build_model(
     num_layers: int,
     heads: int,
     dropout: float,
-    model_type: str = "tasgatv2",
+    model_type: str = "atgatv2",
     type_embedding_dim: int = 16,
 ):
     if model_type == "hgt":
         return build_hgt_model(metadata, hidden_channels, num_layers, heads, dropout)
-    if model_type == "tasgatv2":
-        return build_tasgatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim)
+    if model_type == "atgatv2":
+        return build_atgatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim)
     raise ValueError(f"未知图模型类型: {model_type}")

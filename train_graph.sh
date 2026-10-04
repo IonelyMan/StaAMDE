@@ -9,10 +9,10 @@ INPUT_DIR="/home/linux/7T/lzw/datasets/android_zoo/android_graphs"
 nohup python3 -u ./phase2/graph/train.py \
   --batch-size 8 \
   --input "$INPUT_DIR" \
-  --model-type "tasgatv2" \
+  --model-type "atgatv2" \
   --workers 12 \
   --type-embedding-dim 0 \
-  --info "测试改名后训练是否成功" \
+  --info "标准 GATv2 基线：节点类型嵌入维度为 0" \
   --output "$LOGDIR" > "$LOG" 2>&1 &
 
 echo $!

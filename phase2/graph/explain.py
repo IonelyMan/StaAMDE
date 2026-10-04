@@ -13,14 +13,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from phase2.graph.data import load_graph, load_graph_meta, load_samples, to_homogeneous_graph
 from phase2.graph.inference import describe_graph_input, resolve_graph_inputs
-from phase2.graph.model import build_model
+from phase2.graph.model import build_model, normalize_checkpoint_model_type
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="为TA-SGATv2 图模型生成 attention 解释")
+    parser = argparse.ArgumentParser(description="为 ATGATv2 图模型生成 attention 解释")
     parser.add_argument("--input", help="hetero_graphs 根目录")
     parser.add_argument("--index", help="phase1/build_heterogeneous.py 生成的 index.csv")
-    parser.add_argument("--model-path", required=True, help="训练TA-SGATv2得到的 gatv2_model.pt")
+    parser.add_argument("--model-path", required=True, help="训练 ATGATv2 得到的 gatv2_model.pt")
     parser.add_argument("--output", default="ml_explain", help="解释结果根目录")
     parser.add_argument("--split", choices=["train", "val", "test", "all"], default="test")
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -211,6 +211,9 @@ def main() -> None:
     checkpoint = load_checkpoint(Path(args.model_path))
     config = checkpoint["model_config"]
     metadata = checkpoint["metadata"]
+    saved_model_type = checkpoint.get("model_type") or config.get("model_type") or "atgatv2"
+    if normalize_checkpoint_model_type(saved_model_type) != "atgatv2":
+        raise SystemExit("图注意力解释仅支持 ATGATv2 检查点")
 
     device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
@@ -222,7 +225,7 @@ def main() -> None:
         config["layers"],
         config["heads"],
         config["dropout"],
-        model_type="tasgatv2",
+        model_type="atgatv2",
         type_embedding_dim=config.get("type_embedding_dim", 16),
     ).to(device)
 

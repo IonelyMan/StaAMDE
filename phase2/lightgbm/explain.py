@@ -1,4 +1,4 @@
-"""Write LightGBM SHAP evidence as CSV for one APK or a global cohort."""
+"""Write LightGBM SHAP evidence and figures for one APK or a global cohort."""
 
 import argparse
 import csv
@@ -15,10 +15,11 @@ if str(PROJECT_ROOT) not in sys.path:
 from phase2.lightgbm.dataset import load_static_dataset
 from phase2.lightgbm.inference import filter_indices
 from phase2.lightgbm.model import load_artifacts, predict_probability
+from phase2.lightgbm.shap_plots import plot_global_bar, plot_global_summary, plot_local_waterfall
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Export LightGBM SHAP evidence as CSV")
+    parser = argparse.ArgumentParser(description="Export LightGBM SHAP evidence as CSV and figures")
     parser.add_argument("--input", required=True, help="静态特征报告目录")
     parser.add_argument("--model-dir", required=True, help="LightGBM models 目录")
     parser.add_argument("--output", default="ml_explain", help="解释结果根目录")
@@ -31,6 +32,10 @@ def parse_args():
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--top-k", type=int, default=100, help="局部每个方向或全局保存的特征数")
+    parser.add_argument("--waterfall-top-k", type=int, default=15, help="单样本瀑布图展示的主要特征数")
+    parser.add_argument("--global-plot-top-k", type=int, default=20, help="全局图展示的特征数")
+    parser.add_argument("--figure-format", choices=["png", "pdf", "svg"], default="png")
+    parser.add_argument("--figure-dpi", type=int, default=220)
     return parser.parse_args()
 
 
@@ -89,8 +94,9 @@ def sample_keys(dataset, index):
 
 def main():
     args = parse_args()
-    if args.batch_size < 1 or args.top_k < 1 or args.max_samples < 1:
-        raise SystemExit("--batch-size, --top-k and --max-samples must be positive")
+    if min(args.batch_size, args.top_k, args.max_samples, args.waterfall_top_k,
+           args.global_plot_top_k, args.figure_dpi) < 1:
+        raise SystemExit("Sample limits, plot limits, batch size and figure DPI must be positive")
 
     input_root = Path(args.input)
     split_dir = input_root / args.split
@@ -126,6 +132,17 @@ def main():
         ]
         path = output_root / "global" / "lightgbm" / f"{args.split}_shap_summary.csv"
         write_rows(path, ["rank", "feature", "n_samples", "mean_abs_shap", "mean_shap"], rows)
+        bar_path = plot_global_bar(
+            mean_abs, feature_names, len(indices),
+            path.parent / f"{args.split}_shap_mean_abs_bar.{args.figure_format}",
+            args.global_plot_top_k, args.figure_dpi,
+        )
+        summary_path = plot_global_summary(
+            values, matrix, feature_names, mean_abs,
+            path.parent / f"{args.split}_shap_summary.{args.figure_format}",
+            args.global_plot_top_k, args.figure_dpi,
+        )
+        print(f"SHAP figures: {bar_path}, {summary_path}")
     else:
         index = int(indices[0])
         sample_values = values[0]
@@ -149,6 +166,12 @@ def main():
         write_rows(path, ["sample_key", "sample_id", "apk_name", "y_true", "prob_malware", "pred",
                           "base_value", "model_output", "rank", "feature", "feature_value",
                           "shap_value", "abs_shap_value"], rows)
+        figure_path = plot_local_waterfall(
+            sample_values, feature_names, float(bases[0]), probability, dataset.sample_ids[index],
+            path.parent / f"shap_waterfall.{args.figure_format}",
+            args.waterfall_top_k, args.figure_dpi,
+        )
+        print(f"SHAP figure: {figure_path}")
     print(f"SHAP evidence: {path}")
 
 

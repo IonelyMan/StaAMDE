@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from phase2.common.metrics import binary_metrics
 from phase2.graph.data import GraphDataset, indices_for_split, load_samples, resolve_workers
 from phase2.graph.engine import predict
-from phase2.graph.model import build_model
+from phase2.graph.model import build_model, normalize_checkpoint_model_type
 from phase2.graph.reports import write_json, write_predictions
 
 
@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="使用已训练图模型进行推理")
     parser.add_argument("--input", help="hetero_graphs 根目录")
     parser.add_argument("--index", help="phase1/build_heterogeneous.py 生成的 index.csv")
-    parser.add_argument("--model-path", required=True, help="训练TA-SGATv2得到的 gatv2_model.pt 或 hgt_model.pt")
+    parser.add_argument("--model-path", required=True, help="训练 ATGATv2 得到的 gatv2_model.pt 或 hgt_model.pt")
     parser.add_argument("--output", required=True, help="推理输出目录，例如 runs/hetero_gatv2")
     parser.add_argument("--split", choices=["train", "val", "test", "all"], default="test")
     parser.add_argument("--batch-size", type=int, default=8)
@@ -123,7 +123,11 @@ def main() -> None:
         checkpoint = torch.load(args.model_path, map_location="cpu")
     config = checkpoint["model_config"]
     metadata = checkpoint["metadata"]
-    model_type = checkpoint.get("model_type") or config.get("model_type") or "hgt"
+    saved_model_type = checkpoint.get("model_type") or config.get("model_type") or "hgt"
+    try:
+        model_type = normalize_checkpoint_model_type(saved_model_type)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     data_format = "heterogeneous" if model_type == "hgt" else "homogeneous"
 
     device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
