@@ -18,8 +18,8 @@ def parse_named_path(spec: str) -> Tuple[str, Path]:
         raise ValueError("输入格式应为 name=predictions.csv，例如 static=phase2_runs/static/predictions.csv")
     name, path = spec.split("=", 1)
     name = name.strip()
-    if not name:
-        raise ValueError("模态名称不能为空")
+    if name not in {"static", "graph"}:
+        raise ValueError("只支持 static 和 graph 两个模型输入")
     return name, Path(path)
 
 
@@ -60,8 +60,10 @@ def load_prediction(spec: str) -> pd.DataFrame:
 
 
 def merge_predictions(inputs: List[str]) -> Tuple[pd.DataFrame, List[str]]:
-    frames = [load_prediction(spec) for spec in inputs]
     names = [parse_named_path(spec)[0] for spec in inputs]
+    if len(names) != 2 or set(names) != {"static", "graph"}:
+        raise ValueError("必须分别提供一个 static 和一个 graph 预测 CSV")
+    frames = [load_prediction(spec) for spec in inputs]
     merged = reduce(lambda left, right: pd.merge(left, right, on="sample_key", how="inner"), frames)
     if merged.empty:
         raise ValueError("各模态没有可对齐的 sample_key，请检查 predictions.csv")
@@ -191,12 +193,12 @@ def tune_weights(df: pd.DataFrame, names: List[str], split: str, step: float) ->
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="多模态恶意概率加权集成")
+    parser = argparse.ArgumentParser(description="静态特征与图模型的恶意概率加权集成")
     parser.add_argument(
         "--input",
         action="append",
         required=True,
-        help="name=predictions.csv，可重复传入，例如 static=... graph=... image=...",
+        help="name=predictions.csv，可重复传入，例如 static=... graph=...",
     )
     parser.add_argument("--output", required=True, help="输出目录")
     parser.add_argument("--weights", action="append", default=[], help="name=权重；不传则等权")

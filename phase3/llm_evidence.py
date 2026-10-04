@@ -16,12 +16,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build an LLM evidence packet and prompt from SHAP and graph attention outputs.")
     parser.add_argument("--sample-id", default=None, help="APK sample id. If omitted, choose the highest-risk available prediction.")
     parser.add_argument("--split", default="test")
-    parser.add_argument("--output", default="runs/llm_explain")
-    parser.add_argument("--static-predictions", default="runs/static_lgbm/predictions/test_predictions.csv")
-    parser.add_argument("--graph-predictions", default="runs/hetero_gatv2/predictions/test_predictions.csv")
-    parser.add_argument("--ensemble-predictions", default="runs/ensemble/ensemble_predictions.csv")
-    parser.add_argument("--shap-reports", default="runs/static_lgbm/reports")
-    parser.add_argument("--graph-explain-dir", default="runs/hetero_gatv2/explanations")
+    parser.add_argument("--output", default="llm_explain")
+    parser.add_argument("--static-predictions", default="inference/lightgbm/predictions/test_predictions.csv")
+    parser.add_argument("--graph-predictions", default="inference/tasgatv2/predictions/test_predictions.csv")
+    parser.add_argument("--ensemble-predictions", default="ensemble/ensemble_predictions.csv")
+    parser.add_argument("--ml-explain-dir", default="ml_explain", help="机器学习解释结果根目录")
     parser.add_argument("--top-static-positive", type=int, default=20)
     parser.add_argument("--top-static-negative", type=int, default=10)
     parser.add_argument("--top-global-static", type=int, default=20)
@@ -86,6 +85,9 @@ def compact_text(text: object, max_len: int) -> str:
 
 
 def safe_filename(text: str) -> str:
+    text = Path(str(text)).name
+    if text.lower().endswith(".apk"):
+        text = text[:-4]
     keep = []
     for char in str(text):
         keep.append(char if char.isalnum() or char in {"-", "_", "."} else "_")
@@ -142,37 +144,25 @@ def choose_sample_id(indexed_predictions: Dict[str, Dict[str, Dict[str, object]]
     return candidates[0][2]
 
 
-def find_waterfall_csv(shap_reports: Path, sample_id: str, split: str) -> Optional[Path]:
-    preferred = shap_reports / f"{split}_{safe_filename(sample_id)}_waterfall_contributions.csv"
-    if preferred.exists():
-        return preferred
-    candidates = sorted(shap_reports.glob(f"*{safe_filename(sample_id)}*waterfall_contributions.csv"))
-    if candidates:
-        return candidates[0]
-    for path in sorted(shap_reports.glob("*waterfall_contributions.csv")):
-        rows = read_csv(path)
-        if any(str(row.get("sample_id")) == sample_id for row in rows):
-            return path
-    return None
-
-
 def load_static_local_evidence(
-    shap_reports: Path,
+    sample_dir: Path,
     sample_id: str,
-    split: str,
     top_positive: int,
     top_negative: int,
     max_name_len: int,
 ) -> Tuple[Dict[str, object], List[str]]:
     warnings: List[str] = []
-    path = find_waterfall_csv(shap_reports, sample_id, split)
-    if path is None:
+    path = sample_dir / "shap_contributions.csv"
+    if not path.exists():
         warnings.append(
-            "No local SHAP waterfall contribution CSV was found. Run phase2.lightgbm.explain with --waterfall-sample-id for stronger local evidence."
+            f"No local SHAP CSV found at {path}. Run phase2.lightgbm.explain with --sample-id."
         )
         return {"available": False, "top_positive_features": [], "top_negative_features": []}, warnings
 
     rows = [row for row in read_csv(path) if not row.get("sample_id") or row.get("sample_id") == sample_id]
+    if not rows:
+        warnings.append(f"SHAP CSV has no rows for sample_id={sample_id}: {path}")
+        return {"available": False, "top_positive_features": [], "top_negative_features": []}, warnings
     rows = [row for row in rows if not str(row.get("feature", "")).startswith("other_")]
     positives = sorted([row for row in rows if to_float(row.get("shap_value")) > 0], key=lambda row: to_float(row.get("shap_value")), reverse=True)
     negatives = sorted([row for row in rows if to_float(row.get("shap_value")) < 0], key=lambda row: to_float(row.get("shap_value")))
@@ -207,8 +197,8 @@ def load_static_local_evidence(
     )
 
 
-def load_static_global_summary(shap_reports: Path, split: str, top_k: int, max_name_len: int) -> Dict[str, object]:
-    path = shap_reports / f"{split}_shap_summary.csv"
+def load_static_global_summary(ml_explain_dir: Path, split: str, top_k: int, max_name_len: int) -> Dict[str, object]:
+    path = ml_explain_dir / "global" / "lightgbm" / f"{split}_shap_summary.csv"
     rows = read_csv(path)
     if not rows:
         return {"available": False, "features": []}
@@ -220,6 +210,7 @@ def load_static_global_summary(shap_reports: Path, split: str, top_k: int, max_n
             {
                 "rank": to_int(row.get("rank"), index + 1),
                 "feature": compact_text(row.get("feature"), max_name_len),
+                "n_samples": to_int(row.get("n_samples")) if row.get("n_samples") not in {None, ""} else None,
                 "mean_abs_shap": to_float(row.get("mean_abs_shap")),
                 "mean_shap": to_float(row.get("mean_shap")),
             }
@@ -229,17 +220,19 @@ def load_static_global_summary(shap_reports: Path, split: str, top_k: int, max_n
 
 
 def load_graph_evidence(
-    graph_explain_dir: Path,
+    sample_dir: Path,
     sample_id: str,
     top_nodes: int,
     top_edges: int,
     max_name_len: int,
 ) -> Tuple[Dict[str, object], List[str]]:
     warnings: List[str] = []
-    node_path = graph_explain_dir / "node_attention" / f"{sample_id}.csv"
-    edge_path = graph_explain_dir / "edge_attention" / f"{sample_id}.csv"
+    node_path = sample_dir / "node_attention.csv"
+    edge_path = sample_dir / "edge_attention.csv"
     node_rows = read_csv(node_path)
     edge_rows = read_csv(edge_path)
+    node_rows = [row for row in node_rows if not row.get("sample_id") or row.get("sample_id") == sample_id]
+    edge_rows = [row for row in edge_rows if not row.get("sample_id") or row.get("sample_id") == sample_id]
     if not node_rows:
         warnings.append(
             f"No graph node attention CSV found for sample_id={sample_id}. "
@@ -359,6 +352,7 @@ def prompt_feature_rows(rows: object, limit: int) -> List[Dict[str, object]]:
                     "abs_shap_value": row.get("abs_shap_value"),
                     "mean_abs_shap": row.get("mean_abs_shap"),
                     "mean_shap": row.get("mean_shap"),
+                    "n_samples": row.get("n_samples"),
                     "attention": row.get("attention"),
                     "normalized_attention": row.get("normalized_attention"),
                     "direction": row.get("direction"),
@@ -425,7 +419,7 @@ def build_prompt(evidence: Dict[str, object]) -> str:
             "top_positive": prompt_feature_rows(static_local.get("top_positive_features"), 10_000),
             "top_negative": prompt_feature_rows(static_local.get("top_negative_features"), 10_000),
         },
-        # "static_shap_global_top": prompt_feature_rows(static_global.get("features"), 10_000),
+        "static_shap_global_top": prompt_feature_rows(static_global.get("features"), 10_000),
         "graph_attention": {
             "top_nodes": prompt_feature_rows(graph_attention.get("top_nodes"), 10_000),
             "top_edges": prompt_edge_rows(graph_attention.get("top_edges"), 10_000),
@@ -437,14 +431,14 @@ def build_prompt(evidence: Dict[str, object]) -> str:
     }
     payload = json.dumps(compact_payload, ensure_ascii=False, indent=2)
     return f"""你是安卓恶意软件分析专家，下面是使用机器学习模型对一个 APK 的分类结果（良性或恶意），包括 LightGBM 的局部SHAP贡献以及图模型的节点/边注意力这些归因证据。
-请你基于这些证据，理解权限、API、方法名、类名等其他特征的用途，不要依赖预设标签，你的目标是解释这些证据可能代表什么安卓行为。
+请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。
 核心要求：
-1. 不要把 SHAP 贡献或注意力证据写成绝对因果证明；使用“模型关注到”“可能说明”“需要结合上下文确认”等表述。
-2. 优先解释正向 SHAP 特征、图注意力Top 节点/边；同时说明负向 SHAP 是否削弱恶意判断等。
-3. 对你看得懂的 API/权限/方法名等内容，简要解释其通常用途；对混淆名、未知名或证据不足处，明确说不确定。
-4. 如果最终判定为恶意软件，则必须输出：最终判断、关键证据解释、可能行为、防护建议（给非专业人员)。
-5. 如果最终判定为良性软件，则必须输出：最终判断、关键证据解释。
-6. 解释内容尽量简洁、明了。
+1. 如果你有联网检索能力，请先主动检索最重要、最不确定的权限、Android API、组件和方法名。优先查 Android Developers 官方 API Reference 与 Android 安全/权限文档；第三方库请查其官方文档。核对名称、所属类、版本限制和实际用途，再解释证据。不要只凭名称猜测。
+2. 对关键技术解释给出可核验的文档链接，并说明链接支持哪项用途。不得编造网址、引文或检索结果。如果当前无法联网，明确说明“未完成联网核验”，仅作有保留的解释，不得声称已查证。
+3. 将 APK 中实际观测到的特征、模型归因、官方文档说明、由此推测的行为区分开。某个 API/权限的存在或高注意力不等于该行为实际发生，更不能单独证明恶意意图。不要把 SHAP 或 attention 当作因果证明。
+4. 优先解释局部正向 SHAP 与图注意力 Top 节点/边，也说明局部负向 SHAP 是否削弱恶意判断。全局 SHAP 仅说明模型在样本集合中的平均关注程度，不能代替该 APK 的局部证据。
+5. 对混淆名、非 Android 官方 API、无法核验或证据不足处，明确说不确定，不要补造代码调用链、网络连接、窃取行为或用户操作。
+6. 若最终预测为恶意，输出：最终判断、关键证据解释、可能行为、防护建议（面向非专业人员）；若预测为良性，输出：最终判断、关键证据解释。语言简洁。
 
 证据 JSON：
 ```json
@@ -463,18 +457,20 @@ def main() -> None:
     indexed_predictions = index_predictions(prediction_paths)
     sample_id = choose_sample_id(indexed_predictions, args.sample_id)
     modalities = indexed_predictions.get(sample_id, {})
+    apk_name = (modalities.get("ensemble") or modalities.get("static") or modalities.get("graph") or {}).get("apk_name") or f"{sample_id}.apk"
+    ml_explain_dir = Path(args.ml_explain_dir)
+    sample_dir = ml_explain_dir / safe_filename(str(apk_name))
 
     static_local, static_warnings = load_static_local_evidence(
-        Path(args.shap_reports),
+        sample_dir,
         sample_id,
-        args.split,
         args.top_static_positive,
         args.top_static_negative,
         args.max_name_len,
     )
-    static_global = load_static_global_summary(Path(args.shap_reports), args.split, args.top_global_static, args.max_name_len)
+    static_global = load_static_global_summary(ml_explain_dir, args.split, args.top_global_static, args.max_name_len)
     graph_evidence, graph_warnings = load_graph_evidence(
-        Path(args.graph_explain_dir),
+        sample_dir,
         sample_id,
         args.top_graph_nodes,
         args.top_graph_edges,
@@ -484,19 +480,18 @@ def main() -> None:
     evidence = {
         "prediction": build_prediction_summary(sample_id, modalities),
         "static_local_shap": static_local,
-        # "static_global_shap": static_global,
+        "static_global_shap": static_global,
         "graph_attention": graph_evidence,
         "caveats": [
             "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",
             "Graph attention indicates model focus in the graph classifier; high-attention nodes are candidates for review, not guaranteed malicious code.",
             "Obfuscated method/class names and incomplete failed extractions can reduce interpretability.",
-            "DEX image modality is intentionally excluded from this LLM evidence packet because it is weaker and not directly behavior-interpretable.",
-            "No hard-coded API behavior labels are added; the LLM should infer API/permission/method semantics from the raw evidence.",
+            "API and permission semantics should be verified against authoritative documentation before behavioral inference.",
         ],
         "warnings": static_warnings + graph_warnings,
     }
 
-    output_dir = Path(args.output) / safe_filename(sample_id)
+    output_dir = Path(args.output) / safe_filename(str(apk_name))
     output_dir.mkdir(parents=True, exist_ok=True)
     evidence_path = output_dir / "llm_evidence.json"
     prompt_path = output_dir / "llm_prompt.md"
@@ -512,32 +507,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-"""
-默认给 LLM 更多原始证据：局部 SHAP 正向贡献 Top-20
-局部 SHAP 负向贡献 Top-10
-全局 SHAP Top-20
-图 attention Top-25 节点
-图 attention Top-20 边
-静态/图/集成模型预测概率
-
-prompt 会明确要求 LLM 自己解释 API、权限、方法名用途，并总结为什么被判定为恶意/良性，以及给防护建议。
-
-继续这样用：
-python -m phase3.llm_evidence \
-  --sample-id com.thecybernanny.adroapp \
-  --static-predictions inference/lightgbm/predictions/test_predictions.csv \
-  --graph-predictions inference/graph/predictions/test_predictions.csv \
-  --ensemble-predictions ensemble/ensemble_predictions.csv \
-  --shap-reports explain/lightgbm/reports \
-  --graph-explain-dir explain/graph/explanations \
-  --output ./llm_explain
-
-如果你想喂更多信息：
---top-static-positive 30 \
---top-static-negative 15 \
---top-global-static 30 \
---top-graph-nodes 40 \
---top-graph-edges 30
-"""

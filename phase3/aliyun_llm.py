@@ -19,12 +19,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--sample-id", default=None, help="APK sample id. If omitted, choose the highest-risk available prediction.")
     parser.add_argument("--split", default="test")
-    parser.add_argument("--output", default="runs/llm_explain")
+    parser.add_argument("--output", default="llm_explain")
     parser.add_argument("--static-predictions", default="inference/lightgbm/predictions/test_predictions.csv")
     parser.add_argument("--graph-predictions", default="inference/tasgatv2/predictions/test_predictions.csv")
     parser.add_argument("--ensemble-predictions", default="ensemble/ensemble_predictions.csv")
-    parser.add_argument("--shap-reports", default="explain/lightgbm/reports")
-    parser.add_argument("--graph-explain-dir", default="explain/graph/explanations")
+    parser.add_argument("--ml-explain-dir", default="ml_explain", help="机器学习解释结果根目录")
     parser.add_argument("--top-static-positive", type=int, default=20)
     parser.add_argument("--top-static-negative", type=int, default=10)
     parser.add_argument("--top-global-static", type=int, default=20)
@@ -40,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument(
         "--system-prompt",
-        default="你是严谨的安卓恶意软件分析专家。必须只基于用户给出的模型证据进行解释，不要编造未知事实。",
+        default="你是严谨的安卓恶意软件分析专家。基于给定的模型证据解释；若有联网能力，优先核对 Android 官方文档。不要编造未知事实或来源。",
     )
     parser.add_argument("--dry-run", action="store_true", help="Only build evidence/prompt and print token estimate; do not call the API.")
     return parser.parse_args()
@@ -79,23 +78,25 @@ def build_evidence(args: argparse.Namespace) -> Tuple[str, Dict[str, object], st
     indexed_predictions = llm_evidence.index_predictions(prediction_paths)
     sample_id = llm_evidence.choose_sample_id(indexed_predictions, args.sample_id)
     modalities = indexed_predictions.get(sample_id, {})
+    apk_name = (modalities.get("ensemble") or modalities.get("static") or modalities.get("graph") or {}).get("apk_name") or f"{sample_id}.apk"
+    ml_explain_dir = Path(args.ml_explain_dir)
+    sample_dir = ml_explain_dir / llm_evidence.safe_filename(str(apk_name))
 
     static_local, static_warnings = llm_evidence.load_static_local_evidence(
-        Path(args.shap_reports),
+        sample_dir,
         sample_id,
-        args.split,
         args.top_static_positive,
         args.top_static_negative,
         args.max_name_len,
     )
     static_global = llm_evidence.load_static_global_summary(
-        Path(args.shap_reports),
+        ml_explain_dir,
         args.split,
         args.top_global_static,
         args.max_name_len,
     )
     graph_evidence, graph_warnings = llm_evidence.load_graph_evidence(
-        Path(args.graph_explain_dir),
+        sample_dir,
         sample_id,
         args.top_graph_nodes,
         args.top_graph_edges,
@@ -111,13 +112,12 @@ def build_evidence(args: argparse.Namespace) -> Tuple[str, Dict[str, object], st
             "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",
             "Graph attention indicates model focus in the graph classifier; high-attention nodes are candidates for review, not guaranteed malicious code.",
             "Obfuscated method/class names and incomplete failed extractions can reduce interpretability.",
-            "DEX image modality is intentionally excluded from this LLM evidence packet because it is weaker and not directly behavior-interpretable.",
-            "No hard-coded API behavior labels are added; the LLM should infer API/permission/method semantics from the raw evidence.",
+            "API and permission semantics should be verified against authoritative documentation before behavioral inference.",
         ],
         "warnings": static_warnings + graph_warnings,
     }
     prompt = llm_evidence.build_prompt(evidence)
-    output_dir = Path(args.output) / llm_evidence.safe_filename(sample_id)
+    output_dir = Path(args.output) / llm_evidence.safe_filename(str(apk_name))
     output_dir.mkdir(parents=True, exist_ok=True)
     return sample_id, evidence, prompt, output_dir
 
@@ -302,33 +302,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-"""
-# 需要传入对应样本的节点/边注意力目录（统一存放在ml_explain/graph/explanations下）
-# 并且需要传入对应样本的shap报告目录
-# 其余默认参数自行修改
-python3 -m phase3.aliyun_llm \
-  --sample-id com.pcsensi.app \
-  --shap-reports ml_explain/com.pcsensi.app/reports \
-  --graph-explain-dir ml_explain/graph/explanations \
-  --output ./llm_explain
-
-输出文件：
-runs/llm_explain/<sample_id>/llm_evidence.json
-runs/llm_explain/<sample_id>/llm_prompt.md
-runs/llm_explain/<sample_id>/llm_call_config.json
-runs/llm_explain/<sample_id>/llm_response.md
-runs/llm_explain/<sample_id>/llm_raw_response.json
-runs/llm_explain/<sample_id>/llm_response_meta.json
-
-脚本会在调用前打印：
-input_tokens (tiktoken_estimate 或 fallback_estimate): xxx
-如果阿里云响应里有 usage，还会打印服务端返回的 prompt_tokens、completion_tokens 等信息。
-我也加了 dry-run：
-python -m phase3.aliyun_llm ... --dry-run
-它只生成 evidence、prompt、token 估算，不实际调用 API。
-
-"""
