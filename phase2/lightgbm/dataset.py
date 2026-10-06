@@ -101,6 +101,7 @@ def load_static_dataset(
     forced_split: Optional[str] = None,
     read_report_split: bool = True,
     workers: Optional[int] = 1,
+    report_paths: Optional[Iterable[Path]] = None,
 ) -> StaticDataset:
     sample_ids: List[str] = []
     sample_keys: List[str] = []
@@ -108,7 +109,7 @@ def load_static_dataset(
     labels: List[int] = []
     splits: List[Optional[str]] = []
     features: List[Dict[str, float]] = []
-    report_paths = list(iter_reports(input_dir))
+    report_paths = list(iter_reports(input_dir)) if report_paths is None else sorted(report_paths)
     worker_count = resolve_workers(workers)
 
     tasks = [(str(path), str(input_dir), forced_split, read_report_split) for path in report_paths]

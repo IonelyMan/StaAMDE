@@ -96,7 +96,7 @@ def plot_local_waterfall(
         spine.set_visible(False)
     values_ax.text(0.10, 1.015, "SHAP value", transform=values_ax.transAxes, fontsize=20, fontweight="bold")
 
-    fig.suptitle(f"SHAP贡献图: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1", y=0.875, fontsize=20)
+    fig.suptitle(f"SHAP Waterfall: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1", y=0.895, fontsize=20)
     # fig.text(
     #     0.38, 1.015,
     #     f"SHAP贡献图: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1",

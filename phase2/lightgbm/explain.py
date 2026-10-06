@@ -1,4 +1,4 @@
-"""Write LightGBM SHAP evidence and figures for one APK or a global cohort."""
+"""Write LightGBM SHAP evidence and figures for selected APKs or a global cohort."""
 
 import argparse
 import csv
@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from phase2.lightgbm.dataset import load_static_dataset
+from phase2.lightgbm.dataset import iter_reports, load_static_dataset
 from phase2.lightgbm.inference import filter_indices
 from phase2.lightgbm.model import load_artifacts, predict_probability
 from phase2.lightgbm.shap_plots import plot_global_bar, plot_global_summary, plot_local_waterfall
@@ -25,7 +25,8 @@ def parse_args():
     parser.add_argument("--output", default="ml_explain", help="解释结果根目录")
     parser.add_argument("--split", choices=["train", "val", "test", "all"], default="test")
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--sample-id", help="单个 APK 的 sample_id、APK 文件名或 sample_key")
+    mode.add_argument("--sample-id", nargs="+", action="append", default=[],
+                      help="指定一个或多个 APK；可重复传入，也可用逗号分隔")
     mode.add_argument("--global", dest="global_explain", action="store_true", help="计算样本集合的全局 SHAP 摘要")
     parser.add_argument("--max-samples", type=int, default=800, help="全局模式的抽样上限")
     parser.add_argument("--seed", type=int, default=42)
@@ -92,8 +93,74 @@ def sample_keys(dataset, index):
     return {str(dataset.sample_ids[index]), apk_name, Path(apk_name).stem, str(dataset.sample_keys[index])}
 
 
+def normalize_requested_sample_ids(groups):
+    requested = []
+    seen = set()
+    for group in groups:
+        for value in group if isinstance(group, (list, tuple)) else [group]:
+            for item in str(value).split(","):
+                item = item.strip()
+                if item and item not in seen:
+                    requested.append(item)
+                    seen.add(item)
+    return requested
+
+
+def sample_stem(requested: str) -> str:
+    parts = requested.split(":", 2)
+    if len(parts) == 3 and parts[0] in {"train", "val", "test"} and parts[1] in {"0", "1"}:
+        requested = parts[2]
+    name = Path(requested).name
+    return name[:-4] if name.lower().endswith(".apk") else name
+
+
+def direct_sample_reports(input_dir: Path, requested: str):
+    """Locate phase1 reports by directory name without parsing the whole split."""
+    stem = sample_stem(requested)
+    if stem in {"", ".", ".."}:
+        return []
+    roots = [input_dir]
+    roots.extend(input_dir / split for split in ("train", "val", "test") if (input_dir / split).is_dir())
+    paths = {
+        parent / stem / "static_features_report.json"
+        for root in roots
+        for parent in (root, root / "mal", root / "benign")
+    }
+    return sorted(path for path in paths if path.is_file())
+
+
+def load_requested_dataset(input_dir: Path, forced_split, split: str, requested_ids, workers: int):
+    """Read requested APKs by path, falling back for older directory layouts."""
+    options = {"forced_split": forced_split, "read_report_split": not bool(forced_split)}
+    direct_paths = sorted({path for requested in requested_ids for path in direct_sample_reports(input_dir, requested)})
+
+    def contains_every_requested(dataset):
+        indices = np.arange(len(dataset.splits)) if forced_split else filter_indices(dataset.splits, split)
+        return all(any(requested in sample_keys(dataset, int(index)) for index in indices)
+                   for requested in requested_ids)
+
+    if direct_paths:
+        dataset = load_static_dataset(input_dir, workers=1, report_paths=direct_paths, **options)
+        if contains_every_requested(dataset):
+            return dataset
+
+    # Nonstandard directory layouts still avoid parsing unrelated report contents.
+    stems = {sample_stem(requested) for requested in requested_ids}
+    named_paths = [path for path in iter_reports(input_dir) if path.parent.name in stems]
+    if named_paths and named_paths != direct_paths:
+        dataset = load_static_dataset(input_dir, workers=1, report_paths=named_paths, **options)
+        if contains_every_requested(dataset):
+            return dataset
+
+    # Reports whose apk_name differs from their parent directory require the original scan.
+    return load_static_dataset(input_dir, workers=workers, **options)
+
+
 def main():
     args = parse_args()
+    requested_ids = normalize_requested_sample_ids(args.sample_id)
+    if not args.global_explain and not requested_ids:
+        raise SystemExit("--sample-id requires at least one nonempty APK identifier")
     if min(args.batch_size, args.top_k, args.max_samples, args.waterfall_top_k,
            args.global_plot_top_k, args.figure_dpi) < 1:
         raise SystemExit("Sample limits, plot limits, batch size and figure DPI must be positive")
@@ -102,17 +169,24 @@ def main():
     split_dir = input_root / args.split
     input_dir = split_dir if args.split != "all" and split_dir.is_dir() else input_root
     forced_split = args.split if input_dir == split_dir else None
-    dataset = load_static_dataset(
-        input_dir, forced_split=forced_split, read_report_split=not bool(forced_split), workers=args.workers
-    )
+    if requested_ids:
+        dataset = load_requested_dataset(input_dir, forced_split, args.split, requested_ids, args.workers)
+    else:
+        dataset = load_static_dataset(
+            input_dir, forced_split=forced_split, read_report_split=not bool(forced_split), workers=args.workers
+        )
     indices = np.arange(len(dataset.splits)) if forced_split else filter_indices(dataset.splits, args.split)
     if not len(indices):
         raise SystemExit(f"No samples found for split={args.split} in {input_dir}")
 
-    if args.sample_id:
-        matches = [int(i) for i in indices if args.sample_id in sample_keys(dataset, int(i))]
-        if len(matches) != 1:
-            raise SystemExit(f"Expected exactly one APK for --sample-id={args.sample_id}; found {len(matches)}")
+    if requested_ids:
+        matches = []
+        for requested in requested_ids:
+            found = [int(i) for i in indices if requested in sample_keys(dataset, int(i))]
+            if len(found) != 1:
+                raise SystemExit(f"Expected exactly one APK for --sample-id={requested}; found {len(found)}")
+            if found[0] not in matches:
+                matches.append(found[0])
         indices = np.asarray(matches, dtype=np.int64)
     elif len(indices) > args.max_samples:
         indices = np.random.default_rng(args.seed).choice(indices, args.max_samples, replace=False)
@@ -144,35 +218,44 @@ def main():
         )
         print(f"SHAP figures: {bar_path}, {summary_path}")
     else:
-        index = int(indices[0])
-        sample_values = values[0]
-        feature_values = matrix[0].toarray().ravel() if sparse.issparse(matrix) else np.asarray(matrix[0]).ravel()
-        probability = float(predict_probability(model, matrix)[0])
-        positive = np.flatnonzero(sample_values > 0)
-        negative = np.flatnonzero(sample_values < 0)
-        selected = list(positive[np.argsort(sample_values[positive])[::-1][:args.top_k]])
-        selected += list(negative[np.argsort(sample_values[negative])[:args.top_k]])
-        selected.sort(key=lambda i: abs(sample_values[i]), reverse=True)
-        rows = [
-            {"sample_key": dataset.sample_keys[index], "sample_id": dataset.sample_ids[index],
-             "apk_name": dataset.apk_names[index], "y_true": int(dataset.labels[index]),
-             "prob_malware": probability, "pred": int(probability >= 0.5),
-             "base_value": float(bases[0]), "model_output": float(bases[0] + sample_values.sum()),
-             "rank": rank, "feature": feature_names[int(i)], "feature_value": float(feature_values[i]),
-             "shap_value": float(sample_values[i]), "abs_shap_value": float(abs(sample_values[i]))}
-            for rank, i in enumerate(selected, 1)
-        ]
-        path = output_root / safe_name(dataset.apk_names[index]) / "shap_contributions.csv"
-        write_rows(path, ["sample_key", "sample_id", "apk_name", "y_true", "prob_malware", "pred",
-                          "base_value", "model_output", "rank", "feature", "feature_value",
-                          "shap_value", "abs_shap_value"], rows)
-        figure_path = plot_local_waterfall(
-            sample_values, feature_names, float(bases[0]), probability, dataset.sample_ids[index],
-            path.parent / f"shap_waterfall.{args.figure_format}",
-            args.waterfall_top_k, args.figure_dpi,
-        )
-        print(f"SHAP figure: {figure_path}")
-    print(f"SHAP evidence: {path}")
+        probabilities = predict_probability(model, matrix)
+        directory_names = [safe_name(dataset.apk_names[int(index)]) for index in indices]
+        if len(directory_names) != len({name.casefold() for name in directory_names}):
+            raise SystemExit("Multiple selected APKs share an output directory name; use unique APK names.")
+        for position, index_value in enumerate(indices):
+            index = int(index_value)
+            sample_values = values[position]
+            feature_values = (matrix[position].toarray().ravel() if sparse.issparse(matrix)
+                              else np.asarray(matrix[position]).ravel())
+            probability = float(probabilities[position])
+            positive = np.flatnonzero(sample_values > 0)
+            negative = np.flatnonzero(sample_values < 0)
+            selected = list(positive[np.argsort(sample_values[positive])[::-1][:args.top_k]])
+            selected += list(negative[np.argsort(sample_values[negative])[:args.top_k]])
+            selected.sort(key=lambda i: abs(sample_values[i]), reverse=True)
+            rows = [
+                {"sample_key": dataset.sample_keys[index], "sample_id": dataset.sample_ids[index],
+                 "apk_name": dataset.apk_names[index], "y_true": int(dataset.labels[index]),
+                 "prob_malware": probability, "pred": int(probability >= 0.5),
+                 "base_value": float(bases[position]),
+                 "model_output": float(bases[position] + sample_values.sum()),
+                 "rank": rank, "feature": feature_names[int(i)], "feature_value": float(feature_values[i]),
+                 "shap_value": float(sample_values[i]), "abs_shap_value": float(abs(sample_values[i]))}
+                for rank, i in enumerate(selected, 1)
+            ]
+            path = output_root / directory_names[position] / "shap_contributions.csv"
+            write_rows(path, ["sample_key", "sample_id", "apk_name", "y_true", "prob_malware", "pred",
+                              "base_value", "model_output", "rank", "feature", "feature_value",
+                              "shap_value", "abs_shap_value"], rows)
+            figure_path = plot_local_waterfall(
+                sample_values, feature_names, float(bases[position]), probability, dataset.sample_ids[index],
+                path.parent / f"shap_waterfall.{args.figure_format}",
+                args.waterfall_top_k, args.figure_dpi,
+            )
+            print(f"SHAP figure: {figure_path}")
+            print(f"SHAP evidence: {path}")
+    if args.global_explain:
+        print(f"SHAP evidence: {path}")
 
 
 if __name__ == "__main__":

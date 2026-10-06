@@ -26,9 +26,10 @@ def parse_args() -> argparse.Namespace:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--sample-id",
+        nargs="+",
         action="append",
         default=[],
-        help="指定 APK；可重复传入或用逗号分隔",
+        help="指定一个或多个 APK；可重复传入，也可用逗号分隔",
     )
     mode.add_argument("--all", action="store_true", help="逐个解释当前 split 的所有 APK")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
@@ -80,13 +81,14 @@ def write_rows(path: Path, fieldnames: List[str], rows: List[Dict[str, object]])
         writer.writerows(rows)
 
 
-def normalize_requested_sample_ids(values: Sequence[str]) -> Set[str]:
+def normalize_requested_sample_ids(values: Sequence[object]) -> Set[str]:
     sample_ids: Set[str] = set()
-    for value in values:
-        for item in str(value).split(","):
-            item = item.strip()
-            if item:
-                sample_ids.add(item)
+    for group in values:
+        for value in group if isinstance(group, (list, tuple)) else [group]:
+            for item in str(value).split(","):
+                item = item.strip()
+                if item:
+                    sample_ids.add(item)
     return sample_ids
 
 
@@ -105,14 +107,15 @@ def filter_samples_by_ids(samples: Sequence[Dict[str, object]], requested: Set[s
         return list(samples)
 
     matched = [sample for sample in samples if sample_match_keys(sample) & requested]
-    if matched:
-        return matched
-
-    available = sorted(str(sample.get("sample_id") or sample.get("apk_name") or "") for sample in samples)[:20]
-    raise SystemExit(
-        "No graph samples matched --sample-id. "
-        f"requested={sorted(requested)}; available_examples={available}"
-    )
+    found = set().union(*(sample_match_keys(sample) & requested for sample in matched))
+    missing = requested - found
+    if missing:
+        available = sorted(str(sample.get("sample_id") or sample.get("apk_name") or "") for sample in samples)[:20]
+        raise SystemExit(
+            "Some graph samples did not match --sample-id. "
+            f"missing={sorted(missing)}; available_examples={available}"
+        )
+    return matched
 
 
 def safe_name(value: str) -> str:
@@ -243,6 +246,8 @@ def main() -> None:
         raise SystemExit(describe_graph_input(input_dir, args.split))
 
     requested_sample_ids = normalize_requested_sample_ids(args.sample_id)
+    if not args.all and not requested_sample_ids:
+        raise SystemExit("--sample-id requires at least one nonempty APK identifier")
     samples = filter_samples_by_ids(samples, requested_sample_ids)
     directory_names = [safe_name(str(sample["apk_name"])) for sample in samples]
     if len(directory_names) != len({name.casefold() for name in directory_names}):

@@ -39,17 +39,18 @@ python ensemble_predict.py --input static=inference/lightgbm/predictions/test_pr
 
 ## 机器学习解释
 
-单个 APK 的解释使用 `--sample-id`，两个脚本共用一个输出根目录。目录名取 APK 文件名去掉 `.apk` 后的名称。
+指定 APK 使用 `--sample-id`。两个脚本都支持一次传入多个 ID，也支持重复写 `--sample-id` 或用逗号分隔；结果分别保存在 APK 名称对应的小目录中。默认只解释 test 集。
 
 ```bash
-shap
+python -m phase2.lightgbm.explain \
+  --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
+  --model-dir runs/lightgbm/07-04_12-58_best/models \
+  --split test --sample-id com.pcsensi.app org.ooma.oomaapp \
+  --output ml_explain
 
-1的？ --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/lightgbm/07-04_12-58_best/models --sample-id com.pcsensi.app --output ml_explain
-
-图
 python -m phase2.graph.explain --input ~/7T/lzw/datasets/android_zoo/android_graphs \
   --model-path runs/graph/07-03_15-37_best/models/gatv2_model.pt \
-  --sample-id org.ooma.oomaapp \
+  --split test --sample-id com.pcsensi.app org.ooma.oomaapp \
   --output ml_explain
 ```
 
