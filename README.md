@@ -29,11 +29,11 @@ python -m phase2.graph.train --input outputs/hetero_graphs --output runs/hetero_
 
 ```bash
 python -m phase2.lightgbm.inference --input outputs/static_reports --model-dir runs/static_lgbm/models --output inference/lightgbm --split test
-python -m phase2.graph.inference --input outputs/hetero_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/tasgatv2 --split test
-python ensemble_predict.py --input static=inference/lightgbm/predictions/test_predictions.csv --input graph=inference/tasgatv2/predictions/test_predictions.csv --output ensemble
+python -m phase2.graph.inference --input outputs/hetero_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
+python ensemble_predict.py --input static=inference/lightgbm/predictions/test_predictions.csv --input graph=inference/atgatv2/predictions/test_predictions.csv --output ensemble
 ```
 
-示例中的 `inference/tasgatv2` 是已有预测结果的目录名；模型类型参数现统一为 `atgatv2`，目录名不影响模型加载。
+模型类型参数现统一为 `atgatv2`，目录名不影响模型加载。
 
 集成结果在 `ensemble/ensemble_predictions.csv`。输入 CSV 需要包含 `sample_key`，或者包含可构造该键的 `sample_id,split,y_true`。同一 APK 在两个分支的键必须一致。
 
