@@ -23,7 +23,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ml-explain-dir", default="ml_explain", help="机器学习解释结果根目录")
     parser.add_argument("--top-static-positive", type=int, default=20)
     parser.add_argument("--top-static-negative", type=int, default=10)
-    parser.add_argument("--top-global-static", type=int, default=20)
     parser.add_argument("--top-graph-nodes", type=int, default=25)
     parser.add_argument("--top-graph-edges", type=int, default=20)
     parser.add_argument("--max-name-len", type=int, default=320)
@@ -197,28 +196,6 @@ def load_static_local_evidence(
     )
 
 
-def load_static_global_summary(ml_explain_dir: Path, split: str, top_k: int, max_name_len: int) -> Dict[str, object]:
-    path = ml_explain_dir / "global" / "lightgbm" / f"{split}_shap_summary.csv"
-    rows = read_csv(path)
-    if not rows:
-        return {"available": False, "features": []}
-    rows = sorted(rows, key=lambda row: to_float(row.get("mean_abs_shap")), reverse=True)[:top_k]
-    return {
-        "available": True,
-        "source": str(path),
-        "features": [
-            {
-                "rank": to_int(row.get("rank"), index + 1),
-                "feature": compact_text(row.get("feature"), max_name_len),
-                "n_samples": to_int(row.get("n_samples")) if row.get("n_samples") not in {None, ""} else None,
-                "mean_abs_shap": to_float(row.get("mean_abs_shap")),
-                "mean_shap": to_float(row.get("mean_shap")),
-            }
-            for index, row in enumerate(rows)
-        ],
-    }
-
-
 def load_graph_evidence(
     sample_dir: Path,
     sample_id: str,
@@ -334,50 +311,52 @@ def compact_record(record: Dict[str, object]) -> Dict[str, object]:
     return compact
 
 
-def prompt_feature_rows(rows: object, limit: int) -> List[Dict[str, object]]:
+def prompt_shap_rows(rows: object) -> List[Dict[str, object]]:
     result = []
     if not isinstance(rows, list):
         return result
-    for row in rows[:limit]:
+    for row in rows:
         if not isinstance(row, dict):
             continue
-        result.append(
-            compact_record(
-                {
-                    "rank": row.get("rank"),
-                    "type": row.get("node_type"),
-                    "name": row.get("feature") or row.get("node_name"),
-                    "value": row.get("feature_value"),
-                    "shap_value": row.get("shap_value"),
-                    "abs_shap_value": row.get("abs_shap_value"),
-                    "mean_abs_shap": row.get("mean_abs_shap"),
-                    "mean_shap": row.get("mean_shap"),
-                    "n_samples": row.get("n_samples"),
-                    "attention": row.get("attention"),
-                    "normalized_attention": row.get("normalized_attention"),
-                    "direction": row.get("direction"),
-                }
-            )
-        )
+        result.append(compact_record({
+            "特征": row.get("feature"),
+            "取值": row.get("feature_value"),
+            "SHAP值": row.get("shap_value"),
+        }))
     return result
 
 
-def prompt_edge_rows(rows: object, limit: int) -> List[Dict[str, object]]:
+def prompt_node_rows(rows: object) -> List[Dict[str, object]]:
     result = []
     if not isinstance(rows, list):
         return result
-    for row in rows[:limit]:
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        result.append(compact_record({
+            "类型": row.get("node_type"),
+            "名称": row.get("node_name"),
+            "注意力": row.get("attention"),
+            "归一注意力": row.get("normalized_attention"),
+        }))
+    return result
+
+
+def prompt_edge_rows(rows: object) -> List[Dict[str, object]]:
+    result = []
+    if not isinstance(rows, list):
+        return result
+    for row in rows:
         if not isinstance(row, dict):
             continue
         result.append(
             compact_record(
                 {
-                    "rank": row.get("rank"),
-                    "source_type": row.get("source_type"),
-                    "source": row.get("source_name"),
-                    "target_type": row.get("target_type"),
-                    "target": row.get("target_name"),
-                    "attention": row.get("attention"),
+                    "源类型": row.get("source_type"),
+                    "源名称": row.get("source_name"),
+                    "目标类型": row.get("target_type"),
+                    "目标名称": row.get("target_name"),
+                    "注意力": row.get("attention"),
                 }
             )
         )
@@ -385,59 +364,52 @@ def prompt_edge_rows(rows: object, limit: int) -> List[Dict[str, object]]:
 
 
 def compact_prediction_for_prompt(prediction: Dict[str, object]) -> Dict[str, object]:
+    labels = {"malware": "恶意", "benign": "良性", "unknown": "未知"}
+    modality_names = {"ensemble": "集成", "static": "静态", "graph": "图"}
     modalities = {}
     for name, row in dict(prediction.get("modalities") or {}).items():
         if not isinstance(row, dict):
             continue
-        compact = {"prob_malware": row.get("prob_malware"), "pred": row.get("pred")}
-        for key in ["prob_static", "prob_graph"]:
-            if key in row:
-                compact[key] = row[key]
-        modalities[name] = compact
+        compact = {
+            "恶意概率": row.get("prob_malware"),
+            "判断": labels.get(row.get("pred"), "未知"),
+        }
+        if name == "ensemble":
+            compact["静态概率"] = row.get("prob_static")
+            compact["图概率"] = row.get("prob_graph")
+        modalities[modality_names.get(name, name)] = compact_record(compact)
     return {
-        # "sample_id": prediction.get("sample_id"),
-        "apk_name": prediction.get("apk_name"),
-        # "y_true": prediction.get("y_true"),
-        "final_prediction": prediction.get("final_prediction"),
-        "final_prob_malware": prediction.get("final_prob_malware"),
-        "modalities": modalities,
+        "APK": prediction.get("apk_name"),
+        "最终判断": labels.get(prediction.get("final_prediction"), "未知"),
+        "恶意概率": prediction.get("final_prob_malware"),
+        "模型结果": modalities,
     }
 
 
 def build_prompt(evidence: Dict[str, object]) -> str:
     static_local = evidence["static_local_shap"] if isinstance(evidence.get("static_local_shap"), dict) else {}
-    static_global = evidence["static_global_shap"] if isinstance(evidence.get("static_global_shap"), dict) else {}
     graph_attention = evidence["graph_attention"] if isinstance(evidence.get("graph_attention"), dict) else {}
     compact_payload = {
-        "prediction": compact_prediction_for_prompt(evidence["prediction"]),
-        "evidence_semantics": {
-            "positive_shap": "positive SHAP values increase the malware-class score",
-            "negative_shap": "negative SHAP values decrease the malware-class score",
-            "graph_attention": "higher attention means the graph model focused more on that node/edge",
+        "预测": compact_prediction_for_prompt(evidence["prediction"]),
+        "局部SHAP": {
+            "推向恶意": prompt_shap_rows(static_local.get("top_positive_features")),
+            "推向良性": prompt_shap_rows(static_local.get("top_negative_features")),
         },
-        "static_shap_local": {
-            "top_positive": prompt_feature_rows(static_local.get("top_positive_features"), 10_000),
-            "top_negative": prompt_feature_rows(static_local.get("top_negative_features"), 10_000),
+        "图注意力": {
+            "节点": prompt_node_rows(graph_attention.get("top_nodes")),
+            "边": prompt_edge_rows(graph_attention.get("top_edges")),
         },
-        "static_shap_global_top": prompt_feature_rows(static_global.get("features"), 10_000),
-        "graph_attention": {
-            "top_nodes": prompt_feature_rows(graph_attention.get("top_nodes"), 10_000),
-            "top_edges": prompt_edge_rows(graph_attention.get("top_edges"), 10_000),
-        },
-        "caveats": [
-            "SHAP/attention are model evidence, not causal proof.",
-            "Obfuscation or missing extraction can reduce confidence.",
-        ],
     }
-    payload = json.dumps(compact_payload, ensure_ascii=False, indent=2)
+    payload = json.dumps(compact_payload, ensure_ascii=False, separators=(",", ":"))
     return f"""你是安卓恶意软件分析专家，下面是使用机器学习模型对一个 APK 的分类结果（良性或恶意），包括 LightGBM 的局部SHAP贡献以及图模型的节点/边注意力这些归因证据。
 请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。
 核心要求：
 1. 如果你有联网检索能力，请先主动检索最重要、最不确定的权限、Android API、组件和方法名。优先查 Android Developers 官方 API Reference 与 Android 安全/权限文档；第三方库请查其官方文档。核对名称、所属类、版本限制和实际用途，再解释证据。不要只凭名称猜测。
 2. 将 APK 中实际观测到的特征、模型归因、官方文档说明、由此推测的行为区分开。某个 API/权限的存在或高注意力不等于该行为实际发生，更不能单独证明恶意意图。不要把 SHAP 或 attention 当作因果证明。
-3. 优先解释局部正向 SHAP 与图注意力 Top 节点/边，也说明局部负向 SHAP 是否削弱恶意判断。全局 SHAP 仅说明模型在样本集合中的平均关注程度，不能代替该 APK 的局部证据。
+3. 优先解释局部正向 SHAP 与图注意力 Top 节点/边，也说明局部负向 SHAP 是否削弱恶意判断。SHAP 正值推向恶意、负值推向良性；注意力表示图模型的关注程度。
 4. 对混淆名、非 Android 官方 API、无法核验或证据不足处，明确说不确定，不要补造代码调用链、网络连接、窃取行为或用户操作。
-5. 若最终预测为恶意，输出：最终判断、关键证据解释、可能行为、防护建议（面向非专业人员）；若预测为良性，输出：最终判断、关键证据解释。语言简洁。
+5. 若最终预测为恶意，输出：【一、最终判断】【二、关键证据解释】【三、可能行为】【四、防护建议（面向非专业人员）】；若预测为良性，输出：【一、最终判断】、【二、关键证据解释】；
+6. 总体输出要精准表达，简洁明了。
 
 证据 JSON：
 ```json
@@ -467,7 +439,6 @@ def main() -> None:
         args.top_static_negative,
         args.max_name_len,
     )
-    static_global = load_static_global_summary(ml_explain_dir, args.split, args.top_global_static, args.max_name_len)
     graph_evidence, graph_warnings = load_graph_evidence(
         sample_dir,
         sample_id,
@@ -479,7 +450,6 @@ def main() -> None:
     evidence = {
         "prediction": build_prediction_summary(sample_id, modalities),
         "static_local_shap": static_local,
-        "static_global_shap": static_global,
         "graph_attention": graph_evidence,
         "caveats": [
             "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",

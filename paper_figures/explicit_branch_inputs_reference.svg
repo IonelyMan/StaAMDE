@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="750" viewBox="0 0 1700 750" role="img" aria-label="APK 静态预处理及两条分类分支的明确输入">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #243442; }
+      .title { font-size: 29px; font-weight: 700; }
+      .section { font-size: 25px; font-weight: 700; }
+      .cardtitle { font-size: 23px; font-weight: 700; }
+      .body { font-size: 19px; }
+      .small { font-size: 16px; }
+      .tiny { font-size: 14px; }
+      .mono { font-family: Consolas, "Microsoft YaHei", monospace; }
+    </style>
+  </defs>
+
+  <rect width="1700" height="750" fill="#FFFFFF"/>
+  <text x="47" y="52" class="title">阶段一：APK 静态预处理与双分支模型输入</text>
+  <path d="M47 69 H1653" fill="none" stroke="#DBE4E8" stroke-width="2"/>
+
+  <!-- Shared static source panel. -->
+  <rect x="42" y="105" width="355" height="582" rx="20" fill="#F8FBFC" stroke="#9FB8C3" stroke-width="2"/>
+  <text x="69" y="145" class="section" fill="#315B6F">APK 静态预处理</text>
+  <path d="M69 161 H370" fill="none" stroke="#D2E0E6" stroke-width="1.5"/>
+
+  <rect x="161" y="185" width="113" height="110" rx="12" fill="#FFFFFF" stroke="#29718C" stroke-width="3"/>
+  <path d="M242 185 V212 H274" fill="none" stroke="#29718C" stroke-width="3"/>
+  <path d="M192 228 L180 240 L192 252 M241 228 L253 240 L241 252 M224 222 L208 258" fill="none" stroke="#29718C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="205" y="266" width="52" height="21" rx="5" fill="#E0EDF2"/>
+  <text x="231" y="282" text-anchor="middle" class="tiny mono" font-weight="700" fill="#29718C">APK</text>
+  <text x="219" y="327" text-anchor="middle" class="cardtitle" fill="#315B6F">原始安卓应用</text>
+
+  <path d="M219 341 V374" fill="none" stroke="#718A97" stroke-width="2.5"/>
+  <path d="M213 367 L219 376 L225 367" fill="none" stroke="#718A97" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="72" y="383" width="290" height="61" rx="12" fill="#E8F1F4" stroke="#92B1BE" stroke-width="1.5"/>
+  <text x="217" y="407" text-anchor="middle" class="small" fill="#315B6F">静态解析工具</text>
+  <text x="217" y="430" text-anchor="middle" class="body mono" font-weight="700" fill="#315B6F">Androguard · AnalyzeAPK</text>
+
+  <path d="M219 444 V468" fill="none" stroke="#718A97" stroke-width="2.5"/>
+  <path d="M213 461 L219 470 L225 461" fill="none" stroke="#718A97" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="69" y="477" width="302" height="76" rx="11" fill="#FFFFFF" stroke="#B5CBD5" stroke-width="1.5"/>
+  <text x="88" y="507" class="body mono" font-weight="700">AndroidManifest.xml</text>
+  <text x="88" y="536" class="small" fill="#627784">权限、组件、Intent 声明</text>
+  <rect x="69" y="563" width="302" height="76" rx="11" fill="#FFFFFF" stroke="#B5CBD5" stroke-width="1.5"/>
+  <text x="88" y="593" class="body mono" font-weight="700">classes*.dex</text>
+  <text x="88" y="622" class="small" fill="#627784">方法引用、操作码、字符串</text>
+  <text x="219" y="667" text-anchor="middle" class="small" fill="#607985">不运行应用，不采集动态行为</text>
+
+  <!-- Manifest and DEX observations jointly feed the two extraction routes. -->
+  <path d="M371 515 H425 M371 601 H425 M425 515 V601 M425 558 H449 M449 242 V558 M449 242 H485 M449 539 H485" fill="none" stroke="#5D7380" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M478 236 L487 242 L478 248" fill="none" stroke="#5D7380" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M478 533 L487 539 L478 545" fill="none" stroke="#5D7380" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="425" cy="558" r="5" fill="#5D7380"/>
+
+  <!-- Decision-tree branch. -->
+  <rect x="489" y="105" width="1166" height="273" rx="19" fill="#FCF8FC" stroke="#BF8FC3" stroke-width="2"/>
+  <rect x="516" y="126" width="44" height="44" rx="11" fill="#96539B"/>
+  <text x="538" y="156" text-anchor="middle" font-size="23" font-weight="700" fill="#FFFFFF">1</text>
+  <text x="577" y="157" class="section" fill="#693870">决策树分支</text>
+  <text x="1626" y="157" text-anchor="end" class="small" fill="#8B5B90">从 APK 提取静态语义与统计特征</text>
+  <path d="M516 179 H1628" fill="none" stroke="#E5D5E7" stroke-width="1.5"/>
+
+  <rect x="516" y="195" width="282" height="154" rx="13" fill="#FFFFFF" stroke="#D4B6D7" stroke-width="1.7"/>
+  <text x="537" y="225" class="cardtitle" fill="#693870">静态特征报告</text>
+  <text x="537" y="256" class="small" fill="#584A5D">权限 / 组件 / Intent</text>
+  <text x="537" y="283" class="small" fill="#584A5D">调用引用 / 操作码 / 字符串</text>
+  <rect x="537" y="305" width="237" height="29" rx="7" fill="#F4EBF5"/>
+  <text x="655" y="325" text-anchor="middle" class="tiny mono" fill="#744779">static_features_report.json</text>
+
+  <path d="M802 272 H835" fill="none" stroke="#99579E" stroke-width="2.6"/>
+  <path d="M828 266 L837 272 L828 278" fill="none" stroke="#99579E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="839" y="195" width="432" height="154" rx="13" fill="#F6EDF7" stroke="#A76AAC" stroke-width="2.4"/>
+  <rect x="860" y="210" width="111" height="27" rx="7" fill="#96539B"/>
+  <text x="915" y="229" text-anchor="middle" class="tiny" font-weight="700" fill="#FFFFFF">模型输入 A</text>
+  <text x="861" y="277" class="cardtitle" fill="#64346B">静态特征向量 x_static</text>
+  <text x="861" y="310" class="small" fill="#67546B">二值 / 对数计数编码，训练集互信息筛选</text>
+  <text x="861" y="334" class="tiny" fill="#806B84">每个 APK 对应一个数值向量</text>
+
+  <path d="M1276 272 H1309" fill="none" stroke="#99579E" stroke-width="2.6"/>
+  <path d="M1302 266 L1311 272 L1302 278" fill="none" stroke="#99579E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="1313" y="195" width="314" height="154" rx="13" fill="#FFFFFF" stroke="#D4B6D7" stroke-width="1.7"/>
+  <text x="1470" y="253" text-anchor="middle" class="section" fill="#693870">LightGBM</text>
+  <text x="1470" y="292" text-anchor="middle" class="small" fill="#6D5A71">决策树分类器</text>
+  <text x="1470" y="323" text-anchor="middle" class="small mono" fill="#6D5A71">输出：p_static</text>
+
+  <!-- Graph branch. -->
+  <rect x="489" y="403" width="1166" height="273" rx="19" fill="#F7FBF8" stroke="#94BEA1" stroke-width="2"/>
+  <rect x="516" y="424" width="44" height="44" rx="11" fill="#46865E"/>
+  <text x="538" y="454" text-anchor="middle" font-size="23" font-weight="700" fill="#FFFFFF">2</text>
+  <text x="577" y="455" class="section" fill="#326B45">图结构分支</text>
+  <text x="1626" y="455" text-anchor="end" class="small" fill="#4D8060">从 APK 构建多类型程序实体及关系</text>
+  <path d="M516 477 H1628" fill="none" stroke="#D8E8DC" stroke-width="1.5"/>
+
+  <rect x="516" y="493" width="282" height="154" rx="13" fill="#FFFFFF" stroke="#B5D3BD" stroke-width="1.7"/>
+  <text x="537" y="523" class="cardtitle" fill="#326B45">异构程序图</text>
+  <text x="537" y="554" class="small" fill="#44594B">节点：应用 / 类 / 方法 / API …</text>
+  <text x="537" y="581" class="small" fill="#44594B">边：声明 / 定义 / 调用 / 使用 …</text>
+  <rect x="537" y="603" width="237" height="29" rx="7" fill="#EAF3EC"/>
+  <text x="655" y="623" text-anchor="middle" class="tiny mono" fill="#3C7050">hetero_graph.pt</text>
+
+  <path d="M802 570 H835" fill="none" stroke="#4B8A61" stroke-width="2.6"/>
+  <path d="M828 564 L837 570 L828 576" fill="none" stroke="#4B8A61" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="839" y="493" width="432" height="154" rx="13" fill="#EBF5EE" stroke="#5B986F" stroke-width="2.4"/>
+  <rect x="860" y="508" width="111" height="27" rx="7" fill="#46865E"/>
+  <text x="915" y="527" text-anchor="middle" class="tiny" font-weight="700" fill="#FFFFFF">模型输入 B</text>
+  <text x="861" y="575" class="cardtitle" fill="#326B45">APK 异构图 G_APK</text>
+  <text x="861" y="608" class="small" fill="#4B6653">节点属性、节点类型与结构连接</text>
+  <text x="861" y="632" class="tiny" fill="#68816F">每个 APK 对应一张类型化图</text>
+
+  <path d="M1276 570 H1309" fill="none" stroke="#4B8A61" stroke-width="2.6"/>
+  <path d="M1302 564 L1311 570 L1302 576" fill="none" stroke="#4B8A61" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="1313" y="493" width="314" height="154" rx="13" fill="#FFFFFF" stroke="#B5D3BD" stroke-width="1.7"/>
+  <text x="1470" y="551" text-anchor="middle" class="section" fill="#326B45">ATGATv2</text>
+  <text x="1470" y="590" text-anchor="middle" class="small" fill="#4B6653">同构转换 + 节点类型嵌入</text>
+  <text x="1470" y="621" text-anchor="middle" class="small mono" fill="#4B6653">输出：p_graph</text>
+
+  <text x="47" y="719" class="tiny" fill="#6B7F88">注：两个提取脚本分别使用 Androguard 解析同一 APK；此图表示数据流，不代表一次解析结果在脚本间复用。</text>
+</svg>

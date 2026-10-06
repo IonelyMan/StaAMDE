@@ -70,6 +70,6 @@ python -m phase2.lightgbm.explain --input outputs/static_reports --model-dir run
 python -m phase3.llm_evidence --sample-id sample001 --ml-explain-dir ml_explain --static-predictions inference/lightgbm/predictions/test_predictions.csv --graph-predictions inference/tasgatv2/predictions/test_predictions.csv --ensemble-predictions ensemble/ensemble_predictions.csv --output llm_explain
 ```
 
-结果保存在 `llm_explain/sample001/llm_evidence.json` 与 `llm_prompt.md`。提示词要求有联网能力的 LLM 优先核对 Android Developers 官方文档，引用可核验来源，并标明无法核验之处。若实际调用的模型没有联网工具，提示词会要求明确说明这一限制；仅添加提示词不能赋予模型联网能力。
+结果保存在对应 APK 名称的小目录中的 `llm_evidence.json` 与 `llm_prompt.md`。传给 LLM 的证据 JSON 使用简短中文键名，只包含该 APK 的局部 SHAP 和图注意力；全局 SHAP 仍可独立计算和绘图，但不输入 LLM。提示词要求有联网能力的 LLM 优先核对 Android Developers 官方文档；实际使用的模型仍需具备联网工具才能检索。
 
 可使用 `python -m phase3.aliyun_llm ... --dry-run` 仅生成证据与提示词。正式调用还需要自行配置该脚本使用的 API 参数。

@@ -26,7 +26,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ml-explain-dir", default="ml_explain", help="机器学习解释结果根目录")
     parser.add_argument("--top-static-positive", type=int, default=20)
     parser.add_argument("--top-static-negative", type=int, default=10)
-    parser.add_argument("--top-global-static", type=int, default=20)
     parser.add_argument("--top-graph-nodes", type=int, default=25)
     parser.add_argument("--top-graph-edges", type=int, default=20)
     parser.add_argument("--max-name-len", type=int, default=320)
@@ -89,12 +88,6 @@ def build_evidence(args: argparse.Namespace) -> Tuple[str, Dict[str, object], st
         args.top_static_negative,
         args.max_name_len,
     )
-    static_global = llm_evidence.load_static_global_summary(
-        ml_explain_dir,
-        args.split,
-        args.top_global_static,
-        args.max_name_len,
-    )
     graph_evidence, graph_warnings = llm_evidence.load_graph_evidence(
         sample_dir,
         sample_id,
@@ -106,7 +99,6 @@ def build_evidence(args: argparse.Namespace) -> Tuple[str, Dict[str, object], st
     evidence = {
         "prediction": llm_evidence.build_prediction_summary(sample_id, modalities),
         "static_local_shap": static_local,
-        "static_global_shap": static_global,
         "graph_attention": graph_evidence,
         "caveats": [
             "SHAP explains how static features changed the LightGBM malware score; it is not proof of malicious intent by itself.",
@@ -231,7 +223,6 @@ def redacted_config(args: argparse.Namespace, base_url: str, model: str, token_c
         "split": args.split,
         "top_static_positive": args.top_static_positive,
         "top_static_negative": args.top_static_negative,
-        "top_global_static": args.top_global_static,
         "top_graph_nodes": args.top_graph_nodes,
         "top_graph_edges": args.top_graph_edges,
     }
