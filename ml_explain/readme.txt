@@ -1,6 +1,6 @@
 机器学习解释的统一根目录。
 
-ml_explain/<APK文件名去掉.apk>/
+ml_explain/APK文件名/
   shap_contributions.csv    单个 APK 的 LightGBM 局部 SHAP
   shap_waterfall.png         单个 APK 的 SHAP 瀑布图
   node_attention.csv         单个 APK 的图节点注意力

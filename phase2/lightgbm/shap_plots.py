@@ -70,7 +70,7 @@ def plot_local_waterfall(
         )
         values_ax.text(
             0.10, position, f"{contribution:+.4g}",
-            va="center", ha="left", fontsize=10,
+            va="center", ha="left", fontsize=20,
             color="#a22f2f" if contribution >= 0 else "#20528f",
         )
 
@@ -83,9 +83,9 @@ def plot_local_waterfall(
     ax.set_xlim(lower - 0.08 * spread, upper + 0.08 * spread)
     ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
     ax.set_yticks(y)
-    ax.set_yticklabels([_label(name) for name, _ in rows], fontsize=9.5)
+    ax.set_yticklabels([_label(name) for name, _ in rows], fontsize=20)
     ax.invert_yaxis()
-    ax.set_xlabel("Model output for malware class (raw score)", fontsize=10)
+    ax.set_xlabel("Model output for malware class (raw score)", fontsize=20)
     ax.grid(axis="x", color="#dddddd", linewidth=0.7, alpha=0.8)
     ax.set_axisbelow(True)
 
@@ -94,20 +94,20 @@ def plot_local_waterfall(
     values_ax.tick_params(axis="y", left=False, labelleft=False)
     for spine in values_ax.spines.values():
         spine.set_visible(False)
-    values_ax.text(0.10, 1.015, "SHAP value", transform=values_ax.transAxes, fontsize=10, fontweight="bold")
+    values_ax.text(0.10, 1.015, "SHAP value", transform=values_ax.transAxes, fontsize=20, fontweight="bold")
 
-    fig.suptitle(f"Local SHAP explanation: {_label(sample_id, 72)}", y=0.975, fontsize=15)
-    fig.text(
-        0.38, 0.915,
-        f"P(malware) = {probability:.3f}    Base = {base_value:.3f}    Final = {final_value:.3f}",
-        fontsize=10,
-    )
-    fig.text(
-        0.38, 0.045,
-        "Red increases the malware score; blue decreases it. Full feature names and values are in the CSV.",
-        fontsize=9,
-        color="#555555",
-    )
+    fig.suptitle(f"SHAP贡献图: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1", y=0.875, fontsize=20)
+    # fig.text(
+    #     0.38, 1.015,
+    #     f"SHAP贡献图: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1",
+    #     fontsize=20,
+    # )
+    # fig.text(
+    #     0.38, 0.045,
+    #     "红色表示正向贡献，蓝色表示负向贡献，条形长度表示贡献绝对值",
+    #     fontsize=20,
+    #     color="#555555",
+    # )
     result = _save(fig, path, dpi)
     plt.close(fig)
     return result
@@ -131,18 +131,18 @@ def plot_global_bar(
     fig.subplots_adjust(left=0.40, right=0.94, top=0.88, bottom=0.13)
     ax.barh(y, scores, height=0.63, color="#c53b3b", edgecolor="none")
     ax.set_yticks(y)
-    ax.set_yticklabels([_label(feature_names[int(i)]) for i in order], fontsize=9.5)
+    ax.set_yticklabels([_label(feature_names[int(i)]) for i in order], fontsize=20)
     maximum = float(np.max(scores)) if len(scores) else 0.0
     scale = maximum if maximum > 0 else 1.0
     ax.set_xlim(0, scale * 1.22)
     for position, score in zip(y, scores):
-        ax.text(float(score) + scale * 0.015, position, f"{score:.3g}", va="center", fontsize=9)
+        ax.text(float(score) + scale * 0.015, position, f"{score:.3g}", va="center", fontsize=20)
     ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
-    ax.set_xlabel("Mean |SHAP value| (malware raw score)", fontsize=10)
+    ax.set_xlabel("Mean |SHAP value| (malware raw score)", fontsize=20)
     ax.grid(axis="x", color="#dddddd", linewidth=0.7, alpha=0.8)
     ax.set_axisbelow(True)
-    fig.suptitle(f"Global SHAP feature importance (n = {n_samples})", y=0.97, fontsize=15)
-    fig.text(0.40, 0.045, "Full feature names and values are in the CSV.", fontsize=9, color="#555555")
+    fig.suptitle(f"Global SHAP feature importance (n = {n_samples})", y=0.97, fontsize=20)
+    # fig.text(0.40, 0.045, "Full feature names and values are in the CSV.", fontsize=20, color="#555555")
     result = _save(fig, path, dpi)
     plt.close(fig)
     return result
@@ -186,19 +186,19 @@ def plot_global_summary(
         )
     ax.axvline(0, color="#555555", linewidth=1)
     ax.set_yticks(np.arange(len(order)))
-    ax.set_yticklabels([_label(feature_names[int(i)]) for i in order], fontsize=9.5)
+    ax.set_yticklabels([_label(feature_names[int(i)]) for i in order], fontsize=20)
     ax.set_ylim(-0.7, len(order) - 0.3)
     ax.xaxis.set_major_locator(MaxNLocator(nbins=7))
-    ax.set_xlabel("SHAP value (impact on malware raw score)", fontsize=10)
+    ax.set_xlabel("SHAP value (impact on malware raw score)", fontsize=20)
     ax.grid(axis="x", color="#dddddd", linewidth=0.7, alpha=0.8)
     ax.set_axisbelow(True)
     colorbar_ax = fig.add_axes([0.89, 0.19, 0.018, 0.58])
     colorbar = fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap="coolwarm"), cax=colorbar_ax)
     colorbar.set_ticks([0, 1])
     colorbar.set_ticklabels(["Low", "High"])
-    colorbar.set_label("Relative feature value", fontsize=9)
-    fig.suptitle(f"Global SHAP summary (n = {len(contributions)})", y=0.97, fontsize=15)
-    fig.text(0.40, 0.045, "Each dot is one APK. Full feature names and values are in the CSV.", fontsize=9, color="#555555")
+    colorbar.set_label("Relative feature value", fontsize=20)
+    fig.suptitle(f"Global SHAP summary (n = {len(contributions)})", y=0.97, fontsize=20)
+    fig.text(0.40, 0.045, "Each dot is one APK. Full feature names and values are in the CSV.", fontsize=20, color="#555555")
     result = _save(fig, path, dpi)
     plt.close(fig)
     return result

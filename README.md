@@ -17,10 +17,10 @@ PyTorch Geometric 的安装方式需与本机 PyTorch/CUDA 版本匹配。
 原始 APK 可按 `data/apks/{train,val,test}/{mal,benign}/` 放置。
 
 ```bash
-python phase1/static_feature_extract.py --dataset-root data/apks --belong train --output outputs/static_reports --workers 8
-python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --output outputs/hetero_graphs --workers 8
-python -m phase2.lightgbm.train --input outputs/static_reports --output runs/static_lgbm --mi-k 5000 --workers 4
-python -m phase2.graph.train --input outputs/hetero_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
+python phase1/static_feature_extract.py --dataset-root data/apks --belong train --output /home/linux/7T/lzw/datasets/android_zoo/android_static --workers 8
+python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --output ~/7T/lzw/datasets/android_zoo/android_graphs --workers 8
+python -m phase2.lightgbm.train --input /home/linux/7T/lzw/datasets/android_zoo/android_static --output runs/static_lgbm --mi-k 5000 --workers 4
+python -m phase2.graph.train --input ~/7T/lzw/datasets/android_zoo/android_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
 ```
 
 对 `val` 和 `test` 重复前两条提取命令。静态报告与异构图分别由各自模型读取。
@@ -28,8 +28,8 @@ python -m phase2.graph.train --input outputs/hetero_graphs --output runs/hetero_
 ## 推理与集成
 
 ```bash
-python -m phase2.lightgbm.inference --input outputs/static_reports --model-dir runs/static_lgbm/models --output inference/lightgbm --split test
-python -m phase2.graph.inference --input outputs/hetero_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
+python -m phase2.lightgbm.inference --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/static_lgbm/models --output inference/lightgbm --split test
+python -m phase2.graph.inference --input ~/7T/lzw/datasets/android_zoo/android_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
 python ensemble_predict.py --input static=inference/lightgbm/predictions/test_predictions.csv --input graph=inference/atgatv2/predictions/test_predictions.csv --output ensemble
 ```
 
@@ -42,8 +42,15 @@ python ensemble_predict.py --input static=inference/lightgbm/predictions/test_pr
 单个 APK 的解释使用 `--sample-id`，两个脚本共用一个输出根目录。目录名取 APK 文件名去掉 `.apk` 后的名称。
 
 ```bash
-python -m phase2.lightgbm.explain --input outputs/static_reports --model-dir runs/static_lgbm/models --sample-id sample001 --output ml_explain
-python -m phase2.graph.explain --input outputs/hetero_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --sample-id sample001 --output ml_explain
+shap
+
+1的？ --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/lightgbm/07-04_12-58_best/models --sample-id com.pcsensi.app --output ml_explain
+
+图
+python -m phase2.graph.explain --input ~/7T/lzw/datasets/android_zoo/android_graphs \
+  --model-path runs/graph/07-03_15-37_best/models/gatv2_model.pt \
+  --sample-id org.ooma.oomaapp \
+  --output ml_explain
 ```
 
 以上命令写出：
@@ -59,7 +66,7 @@ ml_explain/sample001/
 全局 SHAP 有独立入口，保存当前 split 的特征平均贡献摘要，以及重要性柱状图和摘要散点图；不会覆盖任何单个 APK 的证据：
 
 ```bash
-python -m phase2.lightgbm.explain --input outputs/static_reports --model-dir runs/static_lgbm/models --global --split test --max-samples 800 --output ml_explain
+python -m phase2.lightgbm.explain --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/lightgbm/07-04_12-58_best/models --global --split test --max-samples 10000 --output ml_explain
 ```
 
 输出在 `ml_explain/global/lightgbm/`：`test_shap_summary.csv`、`test_shap_mean_abs_bar.png`、`test_shap_summary.png`。可用 `--waterfall-top-k` 和 `--global-plot-top-k` 控制图中展示的特征数，`--figure-format` 选择 PNG、PDF 或 SVG。图模型使用 `--all` 可逐个输出某个 split 的所有 APK 的节点、边注意力 CSV；不绘制图结构证据。
