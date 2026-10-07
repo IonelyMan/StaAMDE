@@ -320,7 +320,6 @@ def prompt_shap_rows(rows: object) -> List[Dict[str, object]]:
             continue
         result.append(compact_record({
             "特征": row.get("feature"),
-            "取值": row.get("feature_value"),
             "SHAP值": row.get("shap_value"),
         }))
     return result
@@ -337,7 +336,6 @@ def prompt_node_rows(rows: object) -> List[Dict[str, object]]:
             "类型": row.get("node_type"),
             "名称": row.get("node_name"),
             "注意力": row.get("attention"),
-            "归一注意力": row.get("normalized_attention"),
         }))
     return result
 
@@ -365,25 +363,26 @@ def prompt_edge_rows(rows: object) -> List[Dict[str, object]]:
 
 def compact_prediction_for_prompt(prediction: Dict[str, object]) -> Dict[str, object]:
     labels = {"malware": "恶意", "benign": "良性", "unknown": "未知"}
-    modality_names = {"ensemble": "集成", "static": "静态", "graph": "图"}
-    modalities = {}
-    for name, row in dict(prediction.get("modalities") or {}).items():
-        if not isinstance(row, dict):
-            continue
-        compact = {
-            "恶意概率": row.get("prob_malware"),
-            "判断": labels.get(row.get("pred"), "未知"),
-        }
-        if name == "ensemble":
-            compact["静态概率"] = row.get("prob_static")
-            compact["图概率"] = row.get("prob_graph")
-        modalities[modality_names.get(name, name)] = compact_record(compact)
-    return {
+    modalities = prediction.get("modalities") or {}
+    if not isinstance(modalities, dict):
+        modalities = {}
+    ensemble = modalities.get("ensemble") or {}
+    branch_probs = {}
+    for name, label in (("static", "静态"), ("graph", "图")):
+        row = modalities.get(name)
+        probability = row.get("prob_malware") if isinstance(row, dict) else None
+        if probability is None and isinstance(ensemble, dict):
+            probability = ensemble.get(f"prob_{name}")
+        if probability is not None:
+            branch_probs[label] = probability
+    compact = compact_record({
         "APK": prediction.get("apk_name"),
         "最终判断": labels.get(prediction.get("final_prediction"), "未知"),
         "恶意概率": prediction.get("final_prob_malware"),
-        "模型结果": modalities,
-    }
+    })
+    if branch_probs:
+        compact["分支恶意概率"] = branch_probs
+    return compact
 
 
 def build_prompt(evidence: Dict[str, object]) -> str:
@@ -402,7 +401,7 @@ def build_prompt(evidence: Dict[str, object]) -> str:
     }
     payload = json.dumps(compact_payload, ensure_ascii=False, separators=(",", ":"))
     return f"""你是安卓恶意软件分析专家，下面是对单个APK的SHAP贡献以及图模型的节点/边注意力这些归因证据。
-请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。SHAP 正值推向恶意、负值推向良性；注意力表示图模型的关注程度。
+请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。SHAP 正值推向恶意、负值推向良性；注意力表示图模型的关注程度。勿凭特征名或SHAP值断言实际出现或调用次数。
 核心要求：
 1. 请使用联网搜索工具，优先查Android官方API Reference与安全/权限文档；你需要核对实际用途，再解释证据，不要只凭名称猜测。
 2. 若模型最终预测为恶意，只解释局部正向SHAP与图注意力Top节点/边。若预测为良性，只解释从证据是如何看出是良性软件的。
