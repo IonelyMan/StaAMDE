@@ -1,7 +1,7 @@
 """Readable SHAP figures from LightGBM's native feature contributions."""
 
 from pathlib import Path
-from typing import Sequence
+from typing import Optional, Sequence
 
 import numpy as np
 from scipy import sparse
@@ -40,6 +40,9 @@ def plot_local_waterfall(
     path: Path,
     top_k: int = 15,
     dpi: int = 220,
+    *,
+    y_true: Optional[int] = None,
+    y_pred: Optional[int] = None,
 ) -> Path:
     """Plot the largest local contributions and aggregate the remainder."""
     plt, MaxNLocator = _plotting()
@@ -96,18 +99,13 @@ def plot_local_waterfall(
         spine.set_visible(False)
     values_ax.text(0.10, 1.015, "SHAP value", transform=values_ax.transAxes, fontsize=20, fontweight="bold")
 
-    fig.suptitle(f"SHAP Waterfall: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1", y=0.895, fontsize=20)
-    # fig.text(
-    #     0.38, 1.015,
-    #     f"SHAP贡献图: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, y_true = 1, y_pred = 1",
-    #     fontsize=20,
-    # )
-    # fig.text(
-    #     0.38, 0.045,
-    #     "红色表示正向贡献，蓝色表示负向贡献，条形长度表示贡献绝对值",
-    #     fontsize=20,
-    #     color="#555555",
-    # )
+    true_label = "unknown" if y_true is None else str(y_true)
+    pred_label = "unknown" if y_pred is None else str(y_pred)
+    fig.suptitle(
+        f"SHAP Waterfall: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, "
+        f"y_true = {true_label}, y_pred = {pred_label}",
+        y=0.895, fontsize=20,
+    )
     result = _save(fig, path, dpi)
     plt.close(fig)
     return result

@@ -228,6 +228,8 @@ def main():
             feature_values = (matrix[position].toarray().ravel() if sparse.issparse(matrix)
                               else np.asarray(matrix[position]).ravel())
             probability = float(probabilities[position])
+            y_true = int(dataset.labels[index])
+            y_pred = int(probability >= 0.5)
             positive = np.flatnonzero(sample_values > 0)
             negative = np.flatnonzero(sample_values < 0)
             selected = list(positive[np.argsort(sample_values[positive])[::-1][:args.top_k]])
@@ -235,8 +237,8 @@ def main():
             selected.sort(key=lambda i: abs(sample_values[i]), reverse=True)
             rows = [
                 {"sample_key": dataset.sample_keys[index], "sample_id": dataset.sample_ids[index],
-                 "apk_name": dataset.apk_names[index], "y_true": int(dataset.labels[index]),
-                 "prob_malware": probability, "pred": int(probability >= 0.5),
+                 "apk_name": dataset.apk_names[index], "y_true": y_true,
+                 "prob_malware": probability, "pred": y_pred,
                  "base_value": float(bases[position]),
                  "model_output": float(bases[position] + sample_values.sum()),
                  "rank": rank, "feature": feature_names[int(i)], "feature_value": float(feature_values[i]),
@@ -251,6 +253,7 @@ def main():
                 sample_values, feature_names, float(bases[position]), probability, dataset.sample_ids[index],
                 path.parent / f"shap_waterfall.{args.figure_format}",
                 args.waterfall_top_k, args.figure_dpi,
+                y_true=y_true, y_pred=y_pred,
             )
             print(f"SHAP figure: {figure_path}")
             print(f"SHAP evidence: {path}")
