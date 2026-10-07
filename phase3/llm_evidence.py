@@ -22,9 +22,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ensemble-predictions", default="ensemble/ensemble_predictions.csv")
     parser.add_argument("--ml-explain-dir", default="ml_explain", help="机器学习解释结果根目录")
     parser.add_argument("--top-static-positive", type=int, default=20)
-    parser.add_argument("--top-static-negative", type=int, default=10)
+    parser.add_argument("--top-static-negative", type=int, default=5)
     parser.add_argument("--top-graph-nodes", type=int, default=25)
-    parser.add_argument("--top-graph-edges", type=int, default=20)
+    parser.add_argument("--top-graph-edges", type=int, default=10)
     parser.add_argument("--max-name-len", type=int, default=320)
     return parser.parse_args()
 
@@ -401,15 +401,13 @@ def build_prompt(evidence: Dict[str, object]) -> str:
         },
     }
     payload = json.dumps(compact_payload, ensure_ascii=False, separators=(",", ":"))
-    return f"""你是安卓恶意软件分析专家，下面是使用机器学习模型对一个 APK 的分类结果（良性或恶意），包括 LightGBM 的局部SHAP贡献以及图模型的节点/边注意力这些归因证据。
-请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。
+    return f"""你是安卓恶意软件分析专家，下面是对单个APK的SHAP贡献以及图模型的节点/边注意力这些归因证据。
+请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。SHAP 正值推向恶意、负值推向良性；注意力表示图模型的关注程度。
 核心要求：
-1. 如果你有联网检索能力，请先主动检索最重要、最不确定的权限、Android API、组件和方法名。优先查 Android Developers 官方 API Reference 与 Android 安全/权限文档；第三方库请查其官方文档。核对名称、所属类、版本限制和实际用途，再解释证据。不要只凭名称猜测。
-2. 将 APK 中实际观测到的特征、模型归因、官方文档说明、由此推测的行为区分开。某个 API/权限的存在或高注意力不等于该行为实际发生，更不能单独证明恶意意图。不要把 SHAP 或 attention 当作因果证明。
-3. 优先解释局部正向 SHAP 与图注意力 Top 节点/边，也说明局部负向 SHAP 是否削弱恶意判断。SHAP 正值推向恶意、负值推向良性；注意力表示图模型的关注程度。
-4. 对混淆名、非 Android 官方 API、无法核验或证据不足处，明确说不确定，不要补造代码调用链、网络连接、窃取行为或用户操作。
-5. 若最终预测为恶意，输出：【一、最终判断】【二、关键证据解释】【三、可能行为】【四、防护建议（面向非专业人员）】；若预测为良性，输出：【一、最终判断】、【二、关键证据解释】；
-6. 总体输出要精准表达，简洁明了。
+1. 请使用联网搜索工具，优先查Android官方API Reference与安全/权限文档；你需要核对实际用途，再解释证据，不要只凭名称猜测。
+2. 若模型最终预测为恶意，只解释局部正向SHAP与图注意力Top节点/边。若预测为良性，只解释从证据是如何看出是良性软件的。
+3. 若模型最终预测为恶意，输出：【一、最终判断】【二、关键解释】【三、可能行为】【四、防护建议（面向非专业人员）】，输出控制在400个文字以内；若预测为良性，输出：【一、最终判断】、【二、关键解释】，输出控制在300个文字以内
+4. 总体输出要精准表达，解释简洁明了，但输出的关键解释部分要让非专业人员也能看懂。
 
 证据 JSON：
 ```json

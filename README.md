@@ -45,12 +45,12 @@ python ensemble_predict.py --input static=inference/lightgbm/predictions/test_pr
 python -m phase2.lightgbm.explain \
   --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
   --model-dir runs/lightgbm/07-04_12-58_best/models \
-  --split test --sample-id com.pcsensi.app org.ooma.oomaapp \
+  --split test --sample-id uk.blueapps.nrsv.bible.player \
   --output ml_explain
 
 python -m phase2.graph.explain --input ~/7T/lzw/datasets/android_zoo/android_graphs \
   --model-path runs/graph/07-03_15-37_best/models/gatv2_model.pt \
-  --split test --sample-id com.pcsensi.app org.ooma.oomaapp \
+  --split test --sample-id uk.blueapps.nrsv.bible.player \
   --output ml_explain
 ```
 
@@ -75,7 +75,14 @@ python -m phase2.lightgbm.explain --input /home/linux/7T/lzw/datasets/android_zo
 ## LLM 证据与解释
 
 ```bash
-python -m phase3.llm_evidence --sample-id sample001 --ml-explain-dir ml_explain --static-predictions inference/lightgbm/predictions/test_predictions.csv --graph-predictions inference/tasgatv2/predictions/test_predictions.csv --ensemble-predictions ensemble/ensemble_predictions.csv --output llm_explain
+python -m phase3.aliyun_llm \
+  --sample-id com.pcsensi.app \
+  --split test \
+  --static-predictions inference/lightgbm/predictions/test_predictions.csv \
+  --graph-predictions inference/atgatv2/predictions/test_predictions.csv \
+  --ensemble-predictions ensemble/ensemble_predictions.csv \
+  --ml-explain-dir ml_explain \
+  --output llm_explain
 ```
 
 结果保存在对应 APK 名称的小目录中的 `llm_evidence.json` 与 `llm_prompt.md`。传给 LLM 的证据 JSON 使用简短中文键名，只包含该 APK 的局部 SHAP 和图注意力；全局 SHAP 仍可独立计算和绘图，但不输入 LLM。提示词要求有联网能力的 LLM 优先核对 Android Developers 官方文档；实际使用的模型仍需具备联网工具才能检索。
