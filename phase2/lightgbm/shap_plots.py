@@ -102,7 +102,7 @@ def plot_local_waterfall(
     true_label = "unknown" if y_true is None else str(y_true)
     pred_label = "unknown" if y_pred is None else str(y_pred)
     fig.suptitle(
-        f"SHAP Waterfall: {_label(sample_id, 72)} | P(malware) = {probability:.3f}, "
+        f"SHAP Waterfall: {_label(sample_id, 72)} | P(malware) = {probability:.5f}, "
         f"y_true = {true_label}, y_pred = {pred_label}",
         y=0.895, fontsize=20,
     )

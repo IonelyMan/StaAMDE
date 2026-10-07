@@ -45,12 +45,12 @@ python ensemble_predict.py --input static=inference/lightgbm/predictions/test_pr
 python -m phase2.lightgbm.explain \
   --input /home/linux/7T/lzw/datasets/android_zoo/android_static \
   --model-dir runs/lightgbm/07-04_12-58_best/models \
-  --split test --sample-id uk.blueapps.nrsv.bible.player \
+  --split test --sample-id com.pcsensi.app org.ooma.oomaapp \
   --output ml_explain
 
 python -m phase2.graph.explain --input ~/7T/lzw/datasets/android_zoo/android_graphs \
   --model-path runs/graph/07-03_15-37_best/models/gatv2_model.pt \
-  --split test --sample-id uk.blueapps.nrsv.bible.player \
+  --split test --sample-id com.pcsensi.app \
   --output ml_explain
 ```
 
