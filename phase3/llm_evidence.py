@@ -400,7 +400,7 @@ def build_prompt(evidence: Dict[str, object]) -> str:
         },
     }
     payload = json.dumps(compact_payload, ensure_ascii=False, separators=(",", ":"))
-    return f"""你是安卓恶意软件分析专家，下面是对单个APK的SHAP贡献以及图模型的节点/边注意力这些归因证据。
+    return f"""你是安卓恶意软件分析专家，下面是对单个APK的SHAP贡献以及图模型的节点/边注意力这些归因证据（以JSON格式给出）。
 请你基于这些证据，理解权限、API、方法名、类名等特征的用途，并解释它们可能代表的安卓行为。SHAP 正值推向恶意、负值推向良性；注意力表示图模型的关注程度。勿凭特征名或SHAP值断言实际出现或调用次数。
 核心要求：
 1. 请使用联网搜索工具，优先查Android官方API Reference与安全/权限文档；你需要核对实际用途，再解释证据，不要只凭名称猜测。

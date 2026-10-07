@@ -11,7 +11,7 @@ nohup python3 -u ./phase2/graph/train.py \
   --input "$INPUT_DIR" \
   --model-type "atgatv2" \
   --workers 12 \
-  --type-embedding-dim 0 \
+  --type-embedding-dim 16 \
   --info "标准 GATv2 基线：节点类型嵌入维度为 0" \
   --output "$LOGDIR" > "$LOG" 2>&1 &
 

@@ -5,7 +5,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-# 配置文件,需要自行设置
+# 配置文件,需要自行设置API调用的一些信息，本文通过阿里云百炼大模型平台调用LLM
 from config import DEFAULT_BASE_URL,DEFAULT_MODEL, DASHSCOPE_API_KEY
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -24,10 +24,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--graph-predictions", default="inference/tasgatv2/predictions/test_predictions.csv")
     parser.add_argument("--ensemble-predictions", default="ensemble/ensemble_predictions.csv")
     parser.add_argument("--ml-explain-dir", default="ml_explain", help="机器学习解释结果根目录")
-    parser.add_argument("--top-static-positive", type=int, default=20)
-    parser.add_argument("--top-static-negative", type=int, default=10)
-    parser.add_argument("--top-graph-nodes", type=int, default=25)
-    parser.add_argument("--top-graph-edges", type=int, default=20)
+    parser.add_argument("--top-static-positive", type=int, default=15)
+    parser.add_argument("--top-static-negative", type=int, default=5)
+    parser.add_argument("--top-graph-nodes", type=int, default=15)
+    parser.add_argument("--top-graph-edges", type=int, default=10)
     parser.add_argument("--max-name-len", type=int, default=320)
 
     parser.add_argument("--api-key", default=None, help="Aliyun DashScope API key. Defaults to DASHSCOPE_API_KEY or ALIYUN_API_KEY.")

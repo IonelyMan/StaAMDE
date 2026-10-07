@@ -1,8 +1,8 @@
-# SAMDE：基于静态分析的安卓恶意软件检测与证据约束解释框架
+# StaAMDE：基于静态分析的安卓恶意软件检测与证据约束解释框架
 
-**SAMDE: A Static Analysis-Based Framework for Android Malware Detection and Evidence-Constrained Interpretation**
+**StaAMDE: A Static Analysis-Based Framework for Android Malware Detection and Evidence-Constrained Explanations**
 
-SAMDE 由两条静态分析分类分支组成：LightGBM 学习 APK 静态特征，ATGATv2（**A**ndroid Node **T**ype GATv2）学习从 APK 构建的图结构。集成器按 `sample_key` 对齐两者的预测概率。解释阶段保存 LightGBM 的 SHAP 贡献和图模型的节点、边注意力，再把结构化证据交给 LLM。
+StaAMDE 由两条静态分析分类分支组成：LightGBM 学习 APK 静态特征，ATGATv2（**A**ndroid Node **T**ype GATv2）学习从 APK 构建的图结构。集成器按 `sample_key` 对齐两者的预测概率。解释阶段保存 LightGBM 的 SHAP 贡献和图模型的节点、边注意力，再把结构化证据交给 LLM。
 
 ## 安装
 
@@ -19,11 +19,21 @@ PyTorch Geometric 的安装方式需与本机 PyTorch/CUDA 版本匹配。
 ```bash
 python phase1/static_feature_extract.py --dataset-root data/apks --belong train --output /home/linux/7T/lzw/datasets/android_zoo/android_static --workers 8
 python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --output ~/7T/lzw/datasets/android_zoo/android_graphs --workers 8
-python -m phase2.lightgbm.train --input /home/linux/7T/lzw/datasets/android_zoo/android_static --output runs/static_lgbm --mi-k 5000 --workers 4
-python -m phase2.graph.train --input ~/7T/lzw/datasets/android_zoo/android_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
-```
 
 对 `val` 和 `test` 重复前两条提取命令。静态报告与异构图分别由各自模型读取。
+```
+
+## 训练代码
+```bash
+python -m phase2.lightgbm.train --input /home/linux/7T/lzw/datasets/android_zoo/android_static --output runs/static_lgbm --mi-k 5000 --workers 4 --class-weight balanced
+python -m phase2.graph.train --input ~/7T/lzw/datasets/android_zoo/android_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
+
+或直接运行./train_lightgbm.sh
+./train_graph.sh
+注意修改参数
+```
+
+
 
 ## 推理与集成
 
@@ -76,7 +86,7 @@ python -m phase2.lightgbm.explain --input /home/linux/7T/lzw/datasets/android_zo
 
 ```bash
 python -m phase3.aliyun_llm \
-  --sample-id com.pcsensi.app \
+  --sample-id uk.blueapps.nrsv.bible.player \
   --split test \
   --static-predictions inference/lightgbm/predictions/test_predictions.csv \
   --graph-predictions inference/atgatv2/predictions/test_predictions.csv \
@@ -84,6 +94,7 @@ python -m phase3.aliyun_llm \
   --ml-explain-dir ml_explain \
   --output llm_explain
 ```
+其余默认参数需要在aliyun_llm.py中设置。
 
 结果保存在对应 APK 名称的小目录中的 `llm_evidence.json` 与 `llm_prompt.md`。传给 LLM 的证据 JSON 使用简短中文键名，只包含该 APK 的局部 SHAP 和图注意力；全局 SHAP 仍可独立计算和绘图，但不输入 LLM。提示词要求有联网能力的 LLM 优先核对 Android Developers 官方文档；实际使用的模型仍需具备联网工具才能检索。
 
