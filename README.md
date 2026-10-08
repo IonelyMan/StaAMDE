@@ -1,8 +1,15 @@
 # StaAMDE：基于静态分析的安卓恶意软件检测与证据约束解释框架
+- 李祖旺 徐志贤 吕轶黉 王炜
+- 云南大学软件学院 昆明 650504
+-（12025219065@stu.ynu.edu.cn）
 
 **StaAMDE: A Static Analysis-Based Framework for Android Malware Detection and Evidence-Constrained Explanations**
 
-StaAMDE 由两条静态分析分类分支组成：LightGBM 学习 APK 静态特征，ATGATv2（**A**ndroid Node **T**ype GATv2）学习从 APK 构建的图结构。集成器按 `sample_key` 对齐两者的预测概率。解释阶段保存 LightGBM 的 SHAP 贡献和图模型的节点、边注意力，再把结构化证据交给 LLM。
+Abstract As the Android application ecosystem continues to evolve, malware detection is becoming increasingly challenging. Existing detection methods are prone to performance degradation under conditions of data class imbal-ance and time variation, while traditional discriminative evidence also suffers from limited readability. To address these issues, this paper proposes StaAMDE, a static analysis-based framework for Android malware detection and evidence-constrained explanations. In Stage 1, a dual-branch framework is employed to jointly model the static semantic features of APKs and their heterogeneous graph structures for classification while generating decision evidence. For the graph structure branch, we design ATGATv2, which uses node-type embeddings to retain type information for different program entities and aggregates neighborhood information using GATv2, thereby capturing key attention-based evidence while preserving the distinctions between heterogeneous entities. In Stage 2, attribution evidence from the two branches is integrated to constrain the LLM in generating user-friendly explanation reports. Compared to baseline methods, this approach achieves a 7.25% relative improvement in F1-score, and improvements of 6.03% in geometric mean (G-mean) and 6.20% in average class-specific accuracy (ACSA), demonstrating its effectiveness in improving Android malware detection performance. This framework decouples classification deci-sions from semantic explanation, improving the readability of decision evidence while maintaining detection effi-ciency. The source code is available at https://github.com/IonelyMan/StaAMDE.git.
+Keywords Android malware, Readability, Static analysis, Graph attention networks, Large language models
+
+
+## 目前在投，请勿抄袭，遵守学术诚信
 
 ## 安装
 

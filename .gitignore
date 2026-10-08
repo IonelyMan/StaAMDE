@@ -1,10 +1,12 @@
 *.pyc
 runs/
 ml_explain/graph/explanations/
-config.py
+config_local.py
 ensemble/
-/ml_explain/
-/llm_explain/
-/paper_figures/
+inference/
+ml_explain/
+llm_explain/
+paper_figures/
+result/
 .idea/
 __pycache__/
