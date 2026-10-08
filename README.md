@@ -1,7 +1,7 @@
 # StaAMDE：基于静态分析的安卓恶意软件检测与证据约束解释框架
 - 李祖旺 徐志贤 吕轶黉 王炜
 - 云南大学软件学院 昆明 650504
--（12025219065@stu.ynu.edu.cn）
+- （12025219065@stu.ynu.edu.cn）
 
 **StaAMDE: A Static Analysis-Based Framework for Android Malware Detection and Evidence-Constrained Explanations**
 
@@ -9,7 +9,7 @@ Abstract As the Android application ecosystem continues to evolve, malware detec
 Keywords Android malware, Readability, Static analysis, Graph attention networks, Large language models
 
 
-## 目前在投，请勿抄袭，遵守学术诚信
+## 目前在投，请勿抄袭，遵守学术诚信，以下文档教程基于AI总结，若有不足之处，敬请联系作者解决。
 
 ## 安装
 
