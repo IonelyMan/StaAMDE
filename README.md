@@ -25,7 +25,7 @@ PyTorch Geometric 的安装方式需与本机 PyTorch/CUDA 版本匹配。
 
 ```bash
 python phase1/static_feature_extract.py --dataset-root data/apks --belong train --output /home/linux/7T/lzw/datasets/android_zoo/android_static --workers 8
-python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --output ~/7T/lzw/datasets/android_zoo/android_graphs --workers 8
+python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --output /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --workers 8
 
 对 `val` 和 `test` 重复前两条提取命令。静态报告与异构图分别由各自模型读取。
 ```
@@ -33,12 +33,14 @@ python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --o
 ## 训练代码
 ```bash
 python -m phase2.lightgbm.train --input /home/linux/7T/lzw/datasets/android_zoo/android_static --output runs/static_lgbm --mi-k 5000 --workers 4 --class-weight balanced
-python -m phase2.graph.train --input ~/7T/lzw/datasets/android_zoo/android_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
+python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
 
 或直接运行./train_lightgbm.sh
 ./train_graph.sh
 注意修改参数
 ```
+
+图训练默认使用 `mean_max` 图读出、从训练集估计的 `sqrt` 类别权重、验证 PR-AUC 驱动的学习率调整，以及梯度裁剪。训练目录同时存在 `train/` 和 `val/` 时会沿用已有划分，`test/` 不参与训练或图元数据收集。训练结果的 `metrics/train_metrics.json` 记录划分来源、训练类别数量、权重及最佳轮次。可用 `--class-weight none|sqrt|balanced` 和 `--readout mean|mean_max` 做验证集对照；新模型的推理与解释会从检查点读取读出及节点类型映射配置，旧模型仍使用原配置。
 
 
 
@@ -46,7 +48,7 @@ python -m phase2.graph.train --input ~/7T/lzw/datasets/android_zoo/android_graph
 
 ```bash
 python -m phase2.lightgbm.inference --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/static_lgbm/models --output inference/lightgbm --split test
-python -m phase2.graph.inference --input ~/7T/lzw/datasets/android_zoo/android_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
+python -m phase2.graph.inference --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
 python ensemble_predict.py --input static=inference/lightgbm/predictions/test_predictions.csv --input graph=inference/atgatv2/predictions/test_predictions.csv --output ensemble
 ```
 
@@ -78,7 +80,7 @@ python -m phase2.lightgbm.explain \
   --split test --sample-id com.pcsensi.app org.ooma.oomaapp \
   --output ml_explain
 
-python -m phase2.graph.explain --input ~/7T/lzw/datasets/android_zoo/android_graphs \
+python -m phase2.graph.explain --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs \
   --model-path runs/graph/07-03_15-37_best/models/gatv2_model.pt \
   --split test --sample-id com.pcsensi.app \
   --output ml_explain

@@ -31,6 +31,25 @@ def dataloader_kwargs(worker_count: int, prefetch_factor: int) -> dict:
     }
 
 
+def training_class_weights(labels: np.ndarray, train_idx, mode: str):
+    """Compute loss weights from training labels only; keep mean sample weight at 1."""
+    train_labels = labels[np.asarray(train_idx, dtype=np.int64)]
+    if not np.isin(train_labels, [0, 1]).all():
+        raise ValueError("图分类只支持标签 0（良性）和 1（恶意）")
+    counts = np.bincount(train_labels, minlength=2)
+    if (counts == 0).any():
+        raise ValueError(f"训练集必须同时包含良性和恶意样本，当前类别计数: {counts.tolist()}")
+    if mode == "none":
+        return counts.tolist(), None
+    weights = counts.sum() / (2.0 * counts.astype(np.float64))
+    if mode == "sqrt":
+        weights = np.sqrt(weights)
+    elif mode != "balanced":
+        raise ValueError(f"未知类别权重模式: {mode}")
+    weights /= float(np.dot(counts, weights) / counts.sum())
+    return counts.tolist(), weights.tolist()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="训练 ATGATv2 图分类器")
     parser.add_argument("--input", help="hetero_graphs 根目录；若存在 train/val 子目录，训练只读取这两个 split")
@@ -44,8 +63,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dropout", type=float, default=0.25)
     parser.add_argument("--model-type", default="atgatv2", choices=["atgatv2", "hgt"])
     parser.add_argument("--type-embedding-dim", type=int, default=16, help="ATGATv2 同构图中的节点类型嵌入维度，0 则退化为标准 GATv2")
+    parser.add_argument("--readout", choices=["mean", "mean_max"], default="mean_max", help="图级读出；mean_max 可保留少量高响应节点信号")
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--class-weight", choices=["none", "sqrt", "balanced"], default="sqrt", help="只根据训练集类别频数计算损失权重")
+    parser.add_argument("--grad-clip", type=float, default=2.0, help="梯度范数裁剪阈值；0 表示禁用")
+    parser.add_argument("--lr-scheduler", choices=["none", "plateau"], default="plateau", help="验证指标停滞时降低学习率")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--val-size", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
@@ -89,23 +112,27 @@ def main() -> None:
         args.val_size,
         args.seed,
     )
+    train_counts, weight_values = training_class_weights(labels, train_idx, args.class_weight)
+    print(f"划分来源={split_source}，训练类别计数={train_counts}，类别权重={weight_values}")
     print("扫描图元数据")
-    metadata = collect_metadata(samples, workers=worker_count)
+    metadata = collect_metadata([samples[i] for i in list(train_idx) + list(val_idx)], workers=worker_count)
 
     device = "cuda:0" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
         device = "cpu"
+    class_weights = torch.tensor(weight_values, dtype=torch.float32, device=device) if weight_values is not None else None
 
     loader_kwargs = dataloader_kwargs(worker_count, args.prefetch_factor)
     data_format = "heterogeneous" if args.model_type == "hgt" else "homogeneous"
+    node_types = metadata[0] if args.model_type == "atgatv2" else None
     train_loader = DataLoader(
-        GraphDataset(samples, train_idx, data_format=data_format),
+        GraphDataset(samples, train_idx, data_format=data_format, node_types=node_types),
         batch_size=args.batch_size,
         shuffle=True,
         **loader_kwargs,
     )
     val_loader = DataLoader(
-        GraphDataset(samples, val_idx, data_format=data_format),
+        GraphDataset(samples, val_idx, data_format=data_format, node_types=node_types),
         batch_size=args.batch_size,
         shuffle=False,
         **loader_kwargs,
@@ -120,20 +147,30 @@ def main() -> None:
         args.dropout,
         model_type=args.model_type,
         type_embedding_dim=args.type_embedding_dim,
+        readout=args.readout,
+        node_type_order="global",
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    scheduler = (
+        torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=4, min_lr=1e-5)
+        if args.lr_scheduler == "plateau" else None
+    )
 
     best_val_score = -1.0
     best_state = None
+    best_epoch = None
     stale_epochs = 0
     history = []
 
     # 开始训练模型
     print("开始训练模型")
     for epoch in tqdm(range(1, args.epochs + 1)):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device)
+        current_lr = optimizer.param_groups[0]["lr"]
+        train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights, args.grad_clip)
         val_metrics = evaluate(model, val_loader, device, args.threshold)
         val_score = metric_for_best_model(val_metrics, "pr_auc")
+        if scheduler is not None:
+            scheduler.step(val_score)
         history.append(
             {
                 "epoch": epoch,
@@ -143,6 +180,7 @@ def main() -> None:
                 "val_auc": val_metrics["roc_auc"],
                 "val_f1_score": val_metrics["f1_score"],
                 "val_f1": val_metrics["f1"],
+                "lr": current_lr,
             }
         )
         print(
@@ -157,7 +195,8 @@ def main() -> None:
 
         if val_score is not None and val_score > best_val_score:
             best_val_score = float(val_score)
-            best_state = {key: value.detach().cpu() for key, value in model.state_dict().items()}
+            best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+            best_epoch = epoch
             stale_epochs = 0
         else:
             stale_epochs += 1
@@ -180,6 +219,12 @@ def main() -> None:
         "n_val": len(val_idx),
         "n_test_reserved": len(test_idx),
         "split_source": split_source,
+        "train_class_counts": {"benign": train_counts[0], "malware": train_counts[1]},
+        "class_weight_mode": args.class_weight,
+        "class_weights": weight_values,
+        "readout": args.readout if args.model_type == "atgatv2" else "app",
+        "node_type_order": "global" if args.model_type == "atgatv2" else None,
+        "best_epoch": best_epoch,
         "threshold": float(args.threshold),
         "best_model_metric": "pr_auc",
         "best_val_score": best_val_score,
@@ -209,6 +254,8 @@ def main() -> None:
                 "dropout": args.dropout,
                 "model_type": args.model_type,
                 "type_embedding_dim": args.type_embedding_dim,
+                "readout": args.readout,
+                "node_type_order": "global" if args.model_type == "atgatv2" else "legacy",
             },
             "train_args": vars(args),
         },

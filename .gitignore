@@ -12,3 +12,4 @@ result/
 __pycache__/
 tmp/
 cleanup_audit/
+old_experiment_result/

@@ -5,7 +5,8 @@ import numpy as np
 from phase2.common.metrics import binary_metrics
 
 
-def train_one_epoch(model, loader, optimizer, device) -> float:
+def train_one_epoch(model, loader, optimizer, device, class_weights=None, grad_clip: float = 0.0) -> float:
+    import torch
     import torch.nn.functional as F
 
     model.train()
@@ -15,8 +16,10 @@ def train_one_epoch(model, loader, optimizer, device) -> float:
         batch = batch.to(device)
         optimizer.zero_grad()
         logits = model(batch)
-        loss = F.cross_entropy(logits, batch.y.view(-1))
+        loss = F.cross_entropy(logits, batch.y.view(-1), weight=class_weights)
         loss.backward()
+        if grad_clip > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
         total_loss += float(loss.detach().cpu()) * batch.y.numel()
         total_graphs += int(batch.y.numel())

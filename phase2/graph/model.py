@@ -71,11 +71,18 @@ def build_atgatv2_model(
     heads: int,
     dropout: float,
     type_embedding_dim: int = 16,
+    readout: str = "mean",
+    node_type_order: str = "legacy",
 ):
     import torch
     import torch.nn.functional as F
     from torch import nn
-    from torch_geometric.nn import GATv2Conv, Linear, global_mean_pool
+    from torch_geometric.nn import GATv2Conv, Linear, global_max_pool, global_mean_pool
+
+    if readout not in {"mean", "mean_max"}:
+        raise ValueError(f"未知图读出方式: {readout}")
+    if node_type_order not in {"legacy", "global"}:
+        raise ValueError(f"未知节点类型映射方式: {node_type_order}")
 
     class ATGATv2Classifier(nn.Module):
         def __init__(self):
@@ -86,8 +93,14 @@ def build_atgatv2_model(
             self.model_type = "atgatv2"
             self.dropout = dropout
             self.type_embedding_dim = type_embedding_dim if self.node_types else 0
+            self.readout = readout
+            self.node_type_order = node_type_order
             self.node_type_embedding = (
-                nn.Embedding(max(len(self.node_types), 1), self.type_embedding_dim)
+                nn.Embedding(
+                    max(len(self.node_types) + (node_type_order == "global"), 1),
+                    self.type_embedding_dim,
+                    padding_idx=len(self.node_types) if node_type_order == "global" else None,
+                )
                 if self.type_embedding_dim > 0
                 else None
             )
@@ -106,7 +119,7 @@ def build_atgatv2_model(
                 ]
             )
             self.classifier = nn.Sequential(
-                nn.Linear(hidden_channels, hidden_channels),
+                nn.Linear(hidden_channels * (2 if readout == "mean_max" else 1), hidden_channels),
                 nn.ReLU(),
                 nn.Dropout(dropout),
                 nn.Linear(hidden_channels, 2),
@@ -116,7 +129,7 @@ def build_atgatv2_model(
             x = data.x.float()
             node_type = getattr(data, "node_type", None)
             if self.node_type_embedding is not None and node_type is not None:
-                node_type = node_type.clamp(min=0, max=len(self.node_types) - 1)
+                node_type = node_type.clamp(min=0, max=self.node_type_embedding.num_embeddings - 1)
                 type_x = self.node_type_embedding(node_type)
                 x = torch.cat([x, type_x], dim=-1)
             return F.elu(self.input_proj(x))
@@ -137,6 +150,8 @@ def build_atgatv2_model(
             if batch is None:
                 batch = x.new_zeros(x.size(0), dtype=torch.long)
             graph_x = global_mean_pool(x, batch)
+            if self.readout == "mean_max":
+                graph_x = torch.cat([graph_x, global_max_pool(x, batch)], dim=-1)
             logits = self.classifier(graph_x)
             if return_attention_weights:
                 return logits, attention_weights
@@ -153,9 +168,11 @@ def build_model(
     dropout: float,
     model_type: str = "atgatv2",
     type_embedding_dim: int = 16,
+    readout: str = "mean",
+    node_type_order: str = "legacy",
 ):
     if model_type == "hgt":
         return build_hgt_model(metadata, hidden_channels, num_layers, heads, dropout)
     if model_type == "atgatv2":
-        return build_atgatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim)
+        return build_atgatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim, readout, node_type_order)
     raise ValueError(f"未知图模型类型: {model_type}")

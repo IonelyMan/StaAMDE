@@ -129,13 +129,14 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     data_format = "heterogeneous" if model_type == "hgt" else "homogeneous"
+    node_types = metadata[0] if model_type == "atgatv2" and config.get("node_type_order") == "global" else None
 
     device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
         device = "cpu"
 
     loader = DataLoader(
-        GraphDataset(samples, indices, data_format=data_format),
+        GraphDataset(samples, indices, data_format=data_format, node_types=node_types),
         batch_size=args.batch_size,
         shuffle=False,
         **dataloader_kwargs(worker_count, args.prefetch_factor),
@@ -148,10 +149,12 @@ def main() -> None:
         config["dropout"],
         model_type=model_type,
         type_embedding_dim=config.get("type_embedding_dim", 16),
+        readout=config.get("readout", "mean"),
+        node_type_order=config.get("node_type_order", "legacy"),
     ).to(device)
 
     first_batch = next(
-        iter(DataLoader(GraphDataset(samples, indices[:1], data_format=data_format), batch_size=1, shuffle=False))
+        iter(DataLoader(GraphDataset(samples, indices[:1], data_format=data_format, node_types=node_types), batch_size=1, shuffle=False))
     ).to(device)
     with torch.no_grad():
         model(first_batch)
