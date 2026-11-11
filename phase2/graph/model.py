@@ -4,6 +4,8 @@ def normalize_checkpoint_model_type(value: object) -> str:
         return "hgt"
     if isinstance(value, str) and value.lower().endswith("gatv2"):
         return "atgatv2"
+    if value == "atgatv2":
+        return "atgatv2"
     raise ValueError(f"未知图模型类型: {value}")
 
 

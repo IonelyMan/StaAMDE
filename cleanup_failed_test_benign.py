@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """Remove the eleven known failed benign test samples. Dry run by default."""
 
+"""
+python3 cleanup_failed_test_benign.py \
+  --apk-benign-dir ~/7T/lzw/datasets/android_zoo/android_apks/test/benign
+
+预览会列出每个待删除路径。确认输出符合你的数据后，执行：
+python3 cleanup_failed_test_benign.py \
+  --apk-benign-dir ~/7T/lzw/datasets/android_zoo/android_apks/test/benign \
+  --apply
+"""
+
+
 import argparse
 import csv
 import hashlib
@@ -121,7 +132,19 @@ def main():
     index_counts = Counter(Path(r["apk_name"]).stem for r in benign)
     if len(benign) != 274 or len(index_counts) != 274:
         fail(f"图索引应有 274 条不重复的良性记录，实际 {len(benign)} 条，{len(index_counts)} 个 ID")
-    if set(apk_by_id) != set(report_by_id) or set(apk_by_id) != set(index_counts):
+    apk_ids, static_ids, graph_ids = set(apk_by_id), set(report_by_id), set(index_counts)
+    if apk_ids != static_ids or apk_ids != graph_ids:
+        for label, difference in (
+            ("APK 有、静态报告没有", apk_ids - static_ids),
+            ("静态报告有、APK 没有", static_ids - apk_ids),
+            ("图索引有、APK 没有", graph_ids - apk_ids),
+            ("APK 有、图索引没有", apk_ids - graph_ids),
+            ("静态报告有、图索引没有", static_ids - graph_ids),
+            ("图索引有、静态报告没有", graph_ids - static_ids),
+        ):
+            print(f"{label}: {len(difference)} 个")
+            for sid in sorted(difference):
+                print(f"  {sid}")        
         fail("APK、静态报告与图索引的良性 ID 集合不一致")
     for r in benign:
         sid = Path(r["apk_name"]).stem
