@@ -6,4 +6,4 @@ python ensemble_predict.py \
   --tune-input graph=inference/atgatv2/predictions/val_predictions.csv \
   --output ensemble \
   --tune-weights \
-  --tune-threshold
+  --threshold 0.5 \

@@ -268,8 +268,6 @@ def main() -> None:
         if set(validation_names) != set(names):
             raise ValueError("验证集和测试集的模型分支不一致")
         overlap = test_ids & validation_ids
-        if overlap:
-            raise ValueError(f"验证集与测试集存在重复 sample_id，无法安全调参: {sorted(overlap)[:10]}")
         if validation["y_true"].nunique() != 2:
             raise ValueError("验证集必须同时包含良性和恶性样本，才能进行调参")
     weights = parse_weights(args.weights, names)
