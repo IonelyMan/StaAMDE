@@ -10,3 +10,4 @@ paper_figures/
 result/
 .idea/
 __pycache__/
+tmp/
