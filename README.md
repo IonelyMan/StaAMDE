@@ -69,6 +69,8 @@ python ensemble_predict.py \
 
 调参时输入必须分别标记为 `test` 和 `val`，且两个集合的 `sample_id` 不能重叠。没有验证集时请使用固定的权重和阈值，不要启用搜索。此前在测试集上搜索得到的权重、阈值和指标不能作为无泄漏的测试结果。
 
+错误 APK 及其静态报告、图数据的按划分清理工具见 [deduplicate/README.md](deduplicate/README.md)。
+
 ## 机器学习解释
 
 指定 APK 使用 `--sample-id`。两个脚本都支持一次传入多个 ID，也支持重复写 `--sample-id` 或用逗号分隔；结果分别保存在 APK 名称对应的小目录中。默认只解释 test 集。
