@@ -23,7 +23,7 @@ def parse_named_path(spec: str) -> Tuple[str, Path]:
     return name, Path(path)
 
 
-def load_prediction(spec: str) -> pd.DataFrame:
+def load_prediction(spec: str, required_split: str = None) -> pd.DataFrame:
     name, path = parse_named_path(spec)
     if not path.exists():
         raise FileNotFoundError(path)
@@ -31,6 +31,23 @@ def load_prediction(spec: str) -> pd.DataFrame:
     required = {"prob_malware"}
     if not required.issubset(df.columns):
         raise ValueError(f"{path} 必须包含 prob_malware 列")
+
+    if required_split is not None:
+        required_metadata = {"sample_id", "split", "y_true"}
+        if not required_metadata.issubset(df.columns):
+            raise ValueError(f"调参时 {path} 必须包含 sample_id、split、y_true 列")
+        if df.empty or df[list(required_metadata)].isna().any().any():
+            raise ValueError(f"{path} 没有样本或样本身份、划分、标签存在缺失")
+        if not df["split"].eq(required_split).all():
+            raise ValueError(f"{path} 必须仅包含 split={required_split} 的样本")
+        if not df["y_true"].isin([0, 1]).all():
+            raise ValueError(f"{path} 的 y_true 必须全部为 0 或 1")
+        if df["sample_id"].astype(str).str.strip().eq("").any() or df["sample_id"].duplicated().any():
+            raise ValueError(f"{path} 的 sample_id 不能为空或重复")
+        expected_keys = [build_sample_key(str(sid), required_split, int(label))
+                         for sid, label in zip(df["sample_id"], df["y_true"])]
+        if "sample_key" in df.columns and not df["sample_key"].eq(pd.Series(expected_keys, index=df.index)).all():
+            raise ValueError(f"{path} 的 sample_key 与 sample_id、split 或 y_true 不一致")
 
     if "sample_key" not in df.columns:
         fallback_required = {"sample_id", "split", "y_true"}
@@ -59,19 +76,38 @@ def load_prediction(spec: str) -> pd.DataFrame:
     return df
 
 
-def merge_predictions(inputs: List[str]) -> Tuple[pd.DataFrame, List[str]]:
+def merge_predictions(inputs: List[str], required_split: str = None,
+                      source_sample_ids: set = None) -> Tuple[pd.DataFrame, List[str]]:
     names = [parse_named_path(spec)[0] for spec in inputs]
     if len(names) != 2 or set(names) != {"static", "graph"}:
         raise ValueError("必须分别提供一个 static 和一个 graph 预测 CSV")
-    frames = [load_prediction(spec) for spec in inputs]
+    frames = [load_prediction(spec, required_split=required_split) for spec in inputs]
+    if required_split is not None:
+        if source_sample_ids is not None:
+            for name, frame in zip(names, frames):
+                source_sample_ids.update(frame[f"sample_id_{name}"].astype(str))
+        left, right = frames
+        paired = pd.merge(left, right, left_on=f"sample_id_{names[0]}",
+                          right_on=f"sample_id_{names[1]}", how="inner")
+        if not paired[f"y_true_{names[0]}"].eq(paired[f"y_true_{names[1]}"]).all():
+            raise ValueError(f"split={required_split} 两个分支存在相同 sample_id 但标签不一致")
     merged = reduce(lambda left, right: pd.merge(left, right, on="sample_key", how="inner"), frames)
     if merged.empty:
         raise ValueError("各模态没有可对齐的 sample_key，请检查 predictions.csv")
+    for name, frame in zip(names, frames):
+        unmatched = set(frame["sample_key"]) - set(merged["sample_key"])
+        if unmatched:
+            print(f"[warning] {name} 有 {len(unmatched)} 个样本未能与另一分支对齐，"
+                  f"不会进入集成结果；示例: {sorted(unmatched)[:5]}")
 
     sample_id_cols = [col for col in merged.columns if col.startswith("sample_id_")]
     apk_cols = [col for col in merged.columns if col.startswith("apk_name_")]
     split_cols = [col for col in merged.columns if col.startswith("split_")]
     label_cols = [col for col in merged.columns if col.startswith("y_true_")]
+    if required_split is not None:
+        for columns in (sample_id_cols, split_cols, label_cols):
+            if len(columns) != 2 or not merged[columns[0]].eq(merged[columns[1]]).all():
+                raise ValueError(f"两个分支的样本身份、划分或标签不一致: {columns}")
     if sample_id_cols:
         merged["sample_id"] = merged[sample_id_cols].bfill(axis=1).iloc[:, 0]
     if apk_cols:
@@ -174,11 +210,11 @@ def generate_weight_grid(names: List[str], step: float):
 
 
 def tune_weights(df: pd.DataFrame, names: List[str], split: str, step: float) -> Dict[str, float]:
-    if "y_true" not in df.columns:
-        raise ValueError("没有 y_true，无法自动搜索权重")
-    target = df[df.get("split", split) == split] if "split" in df.columns else df
+    if split != "val" or "split" not in df.columns or "y_true" not in df.columns:
+        raise ValueError("权重搜索必须使用带有标签和 split 的验证集")
+    target = df[df["split"] == "val"]
     if target.empty:
-        target = df
+        raise ValueError("没有验证集样本，不能搜索权重")
 
     y_true = target["y_true"].to_numpy(dtype=int)
     best_weights = {name: 1.0 / len(names) for name in names}
@@ -205,28 +241,45 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--tune-threshold", action="store_true", help="在 tune-split 上搜索 F1 最优阈值")
     parser.add_argument("--tune-weights", action="store_true", help="在 tune-split 上粗搜索 PR AUC 最优权重")
-    parser.add_argument("--tune-split", default="val")
+    parser.add_argument("--tune-input", action="append", default=[],
+                        help="独立验证集预测 CSV，分别传入 static=... 和 graph=...")
+    parser.add_argument("--tune-split", choices=["val"], default="val")
     parser.add_argument("--weight-step", type=float, default=0.1)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    tuning = args.tune_weights or args.tune_threshold
+    if tuning and not args.tune_input:
+        raise SystemExit("自动搜索必须通过 --tune-input 分别提供两个分支的验证集预测文件")
+    if args.tune_input and not tuning:
+        raise SystemExit("提供 --tune-input 时必须启用 --tune-weights 或 --tune-threshold")
     output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
-    merged, names = merge_predictions(args.input)
+    test_ids = set()
+    merged, names = merge_predictions(args.input, required_split="test" if tuning else None,
+                                      source_sample_ids=test_ids)
+    validation = None
+    if tuning:
+        validation_ids = set()
+        validation, validation_names = merge_predictions(args.tune_input, required_split="val",
+                                                         source_sample_ids=validation_ids)
+        if set(validation_names) != set(names):
+            raise ValueError("验证集和测试集的模型分支不一致")
+        overlap = test_ids & validation_ids
+        if overlap:
+            raise ValueError(f"验证集与测试集存在重复 sample_id，无法安全调参: {sorted(overlap)[:10]}")
+        if validation["y_true"].nunique() != 2:
+            raise ValueError("验证集必须同时包含良性和恶性样本，才能进行调参")
     weights = parse_weights(args.weights, names)
     if args.tune_weights:
-        weights = tune_weights(merged, names, args.tune_split, args.weight_step)
+        weights = tune_weights(validation, names, args.tune_split, args.weight_step)
 
     prob = ensemble_probability(merged, weights)
     threshold = args.threshold
-    if args.tune_threshold and "y_true" in merged.columns:
-        target = merged[merged["split"] == args.tune_split] if "split" in merged.columns else merged
-        if target.empty:
-            target = merged
-        threshold = tune_threshold(target["y_true"].to_numpy(dtype=int), ensemble_probability(target, weights))
+    if args.tune_threshold:
+        threshold = tune_threshold(validation["y_true"].to_numpy(dtype=int), ensemble_probability(validation, weights))
 
     merged["prob_malware"] = prob
     merged["pred"] = (merged["prob_malware"] >= threshold).astype(int)
@@ -241,6 +294,7 @@ def main() -> None:
         output_cols.append("y_true")
     output_cols.extend([f"prob_{name}" for name in names])
     output_cols.extend(["prob_malware", "pred"])
+    output_dir.mkdir(parents=True, exist_ok=True)
     merged[output_cols].to_csv(output_dir / "ensemble_predictions.csv", index=False)
 
     metrics = {
@@ -249,6 +303,10 @@ def main() -> None:
         "n_samples": int(len(merged)),
         "models": names,
     }
+    if tuning:
+        metrics["tuning"] = {"split": "val", "n_samples": int(len(validation)),
+                             "inputs": args.tune_input, "tune_weights": args.tune_weights,
+                             "tune_threshold": args.tune_threshold}
     if "y_true" in merged.columns:
         y_true = merged["y_true"].to_numpy(dtype=int)
         metrics["all"] = metrics_for(y_true, prob, threshold)
