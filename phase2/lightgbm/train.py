@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -14,7 +15,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from phase2.common.metrics import binary_metrics
 from phase2.common.splits import split_indices_auto
 from phase2.lightgbm.dataset import load_static_train_val_dataset
-from phase2.lightgbm.model import predict_probability, save_artifacts, select_by_mutual_info
+from phase2.lightgbm.model import (predict_probability, save_artifacts,
+                                   save_validation_checkpoint, select_by_mutual_info)
 from phase2.lightgbm.reports import write_feature_scores, write_json, write_lightgbm_importance
 
 
@@ -24,6 +26,28 @@ def lgb_pr_auc_metric(y_true, y_pred):
     if len(set(y_true.tolist())) < 2:
         return "pr_auc", 0.0, True
     return "pr_auc", float(average_precision_score(y_true, y_pred)), True
+
+
+def best_checkpoint_callback(model_dir, vectorizer, selected_indices, selected_names):
+    """Persist the complete best validation checkpoint after each improved round."""
+    best_score = -math.inf
+
+    def callback(env):
+        nonlocal best_score
+        for result in env.evaluation_result_list or []:
+            if result[0] == "valid_0" and result[1] == "pr_auc":
+                score = float(result[2])
+                if math.isfinite(score) and score > best_score:
+                    save_validation_checkpoint(env.model, env.iteration + 1, score, vectorizer,
+                                               selected_indices, selected_names, model_dir)
+                    best_score = score
+                    callback.saved_iteration = env.iteration + 1
+                break
+
+    callback.order = 20
+    callback.before_iteration = False
+    callback.saved_iteration = None
+    return callback
 
 
 def parse_args() -> argparse.Namespace:
@@ -95,9 +119,11 @@ def main() -> None:
     print("开始训练模型")
     X_train = X_selected[train_idx]
     X_val = X_selected[val_idx]
-    callbacks = []
+    checkpoint_callback = best_checkpoint_callback(model_dir, vectorizer, selected_indices, selected_names)
+    callbacks = [checkpoint_callback, lgb.log_evaluation(50)]
     if args.early_stopping > 0 and len(set(dataset.labels[val_idx].tolist())) == 2:
-        callbacks = [lgb.early_stopping(args.early_stopping), lgb.log_evaluation(50)]
+        callbacks.append(lgb.early_stopping(args.early_stopping))
+    try:
         model.fit(
             X_train,
             dataset.labels[train_idx],
@@ -105,8 +131,14 @@ def main() -> None:
             eval_metric=lgb_pr_auc_metric,
             callbacks=callbacks,
         )
-    else:
-        model.fit(X_train, dataset.labels[train_idx])
+    except BaseException:
+        checkpoint = model_dir / "best_checkpoint.joblib"
+        if checkpoint_callback.saved_iteration is not None:
+            print(f"训练中断；第 {checkpoint_callback.saved_iteration} 轮的最佳模型已保存: {checkpoint}",
+                  file=sys.stderr)
+        else:
+            print("训练中断，尚无已完成验证轮次，无法保存最佳模型。", file=sys.stderr)
+        raise
     print("模型训练完成")
     train_probs = predict_probability(model, X_selected[train_idx])
     val_probs = predict_probability(model, X_selected[val_idx])

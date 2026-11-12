@@ -1,7 +1,9 @@
 import argparse
 import json
+import os
 import random
 import sys
+import tempfile
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
@@ -48,6 +50,36 @@ def training_class_weights(labels: np.ndarray, train_idx, mode: str):
         raise ValueError(f"未知类别权重模式: {mode}")
     weights /= float(np.dot(counts, weights) / counts.sum())
     return counts.tolist(), weights.tolist()
+
+
+def save_best_checkpoint(torch, path: Path, state_dict, metadata, args) -> None:
+    """Atomically replace the last validated best model."""
+    payload = {
+        "state_dict": state_dict,
+        "metadata": metadata,
+        "model_type": args.model_type,
+        "model_config": {
+            "hidden_channels": args.hidden_channels,
+            "layers": args.layers,
+            "heads": args.heads,
+            "dropout": args.dropout,
+            "model_type": args.model_type,
+            "type_embedding_dim": args.type_embedding_dim,
+            "readout": args.readout,
+            "node_type_order": "global" if args.model_type == "atgatv2" else "legacy",
+        },
+        "train_args": vars(args),
+    }
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".graph-best-", suffix=".pt",
+                                         delete=False) as handle:
+            temporary = Path(handle.name)
+        torch.save(payload, temporary)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
 
 def parse_args() -> argparse.Namespace:
@@ -161,47 +193,58 @@ def main() -> None:
     best_epoch = None
     stale_epochs = 0
     history = []
+    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "gatv2_model.pt"
+    checkpoint_path = model_dir / model_filename
 
     # 开始训练模型
     print("开始训练模型")
-    for epoch in tqdm(range(1, args.epochs + 1)):
-        current_lr = optimizer.param_groups[0]["lr"]
-        train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights, args.grad_clip)
-        val_metrics = evaluate(model, val_loader, device, args.threshold)
-        val_score = metric_for_best_model(val_metrics, "pr_auc")
-        if scheduler is not None:
-            scheduler.step(val_score)
-        history.append(
-            {
-                "epoch": epoch,
-                "train_loss": train_loss,
-                "val_pr_auc": val_metrics["pr_auc"],
-                "val_roc_auc": val_metrics["roc_auc"],
-                "val_auc": val_metrics["roc_auc"],
-                "val_f1_score": val_metrics["f1_score"],
-                "val_f1": val_metrics["f1"],
-                "lr": current_lr,
-            }
-        )
-        print(
-            "epoch={epoch:03d} loss={loss:.4f} val_pr_auc={pr_auc} val_roc_auc={roc_auc} val_f1={f1}".format(
-                epoch=epoch,
-                loss=train_loss,
-                pr_auc=format_metric(val_metrics["pr_auc"]),
-                roc_auc=format_metric(val_metrics["roc_auc"]),
-                f1=format_metric(val_metrics["f1_score"]),
+    try:
+        for epoch in tqdm(range(1, args.epochs + 1)):
+            current_lr = optimizer.param_groups[0]["lr"]
+            train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights, args.grad_clip)
+            val_metrics = evaluate(model, val_loader, device, args.threshold)
+            val_score = metric_for_best_model(val_metrics, "pr_auc")
+            if scheduler is not None:
+                scheduler.step(val_score)
+            history.append(
+                {
+                    "epoch": epoch,
+                    "train_loss": train_loss,
+                    "val_pr_auc": val_metrics["pr_auc"],
+                    "val_roc_auc": val_metrics["roc_auc"],
+                    "val_auc": val_metrics["roc_auc"],
+                    "val_f1_score": val_metrics["f1_score"],
+                    "val_f1": val_metrics["f1"],
+                    "lr": current_lr,
+                }
             )
-        )
+            print(
+                "epoch={epoch:03d} loss={loss:.4f} val_pr_auc={pr_auc} val_roc_auc={roc_auc} val_f1={f1}".format(
+                    epoch=epoch,
+                    loss=train_loss,
+                    pr_auc=format_metric(val_metrics["pr_auc"]),
+                    roc_auc=format_metric(val_metrics["roc_auc"]),
+                    f1=format_metric(val_metrics["f1_score"]),
+                )
+            )
 
-        if val_score is not None and val_score > best_val_score:
-            best_val_score = float(val_score)
-            best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
-            best_epoch = epoch
-            stale_epochs = 0
+            if val_score is not None and val_score > best_val_score:
+                candidate_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+                save_best_checkpoint(torch, checkpoint_path, candidate_state, metadata, args)
+                best_val_score = float(val_score)
+                best_state = candidate_state
+                best_epoch = epoch
+                stale_epochs = 0
+            else:
+                stale_epochs += 1
+                if stale_epochs >= args.patience:
+                    break
+    except BaseException:
+        if best_epoch is not None:
+            print(f"训练中断；epoch {best_epoch} 的最佳模型已保存: {checkpoint_path}", file=sys.stderr)
         else:
-            stale_epochs += 1
-            if stale_epochs >= args.patience:
-                break
+            print("训练中断，尚无已完成验证的最佳 epoch。", file=sys.stderr)
+        raise
 
     if best_state is not None:
         model.load_state_dict(best_state)
@@ -210,7 +253,6 @@ def main() -> None:
     train_metrics = evaluate(model, train_loader, device, args.threshold)
     val_metrics = evaluate(model, val_loader, device, args.threshold)
     # 沿用 gatv2_model.pt 文件名，避免重命名已有模型文件；嵌入维度为 0 时对应标准 GATv2。
-    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "gatv2_model.pt"
     summary = {
         "train": train_metrics,
         "val": val_metrics,
@@ -242,25 +284,8 @@ def main() -> None:
     write_json(metrics_dir / "train_metrics.json", summary)
     write_json(logs_dir / "history.json", {"history": history})
     write_json(logs_dir / "train_config.json", vars(args))
-    torch.save(
-        {
-            "state_dict": model.state_dict(),
-            "metadata": metadata,
-            "model_type": args.model_type,
-            "model_config": {
-                "hidden_channels": args.hidden_channels,
-                "layers": args.layers,
-                "heads": args.heads,
-                "dropout": args.dropout,
-                "model_type": args.model_type,
-                "type_embedding_dim": args.type_embedding_dim,
-                "readout": args.readout,
-                "node_type_order": "global" if args.model_type == "atgatv2" else "legacy",
-            },
-            "train_args": vars(args),
-        },
-        model_dir / model_filename,
-    )
+    if best_state is None:
+        save_best_checkpoint(torch, checkpoint_path, model.state_dict(), metadata, args)
     print(json.dumps(summary["val"], ensure_ascii=False, indent=2))
 
 

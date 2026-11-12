@@ -54,6 +54,8 @@ python ensemble_predict.py --input static=inference/lightgbm/predictions/test_pr
 
 模型类型参数现统一为 `atgatv2`，目录名不影响模型加载。
 
+训练期间图模型每次刷新验证集最佳指标都会更新 `models/gatv2_model.pt`（HGT 为 `hgt_model.pt`）；LightGBM 会写出包含模型及特征映射的 `models/best_checkpoint.joblib`。若后续轮次报错，已完成验证的最佳检查点可继续用于推理和解释；成功训练后 LightGBM 仍保存原有模型文件。尚未完成首轮验证时无法生成本次训练的最佳检查点。
+
 集成结果在 `ensemble/ensemble_predictions.csv`。输入 CSV 需要包含 `sample_key`，或者包含可构造该键的 `sample_id,split,y_true`。同一 APK 在两个分支的键必须一致。
 
 如需自动搜索权重或阈值，请先使用两个分支分别生成 `--split val` 的预测，再用独立验证集调参、测试集评估：
