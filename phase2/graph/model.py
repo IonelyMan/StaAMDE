@@ -73,10 +73,12 @@ def build_atgatv2_model(
     type_embedding_dim: int = 16,
     readout: str = "mean",
     node_type_order: str = "legacy",
+    activation_checkpointing: bool = False,
 ):
     import torch
     import torch.nn.functional as F
     from torch import nn
+    from torch.utils.checkpoint import checkpoint
     from torch_geometric.nn import GATv2Conv, Linear, global_max_pool, global_mean_pool
 
     if readout not in {"mean", "mean_max"}:
@@ -95,6 +97,7 @@ def build_atgatv2_model(
             self.type_embedding_dim = type_embedding_dim if self.node_types else 0
             self.readout = readout
             self.node_type_order = node_type_order
+            self.activation_checkpointing = activation_checkpointing
             self.node_type_embedding = (
                 nn.Embedding(
                     max(len(self.node_types) + (node_type_order == "global"), 1),
@@ -142,6 +145,8 @@ def build_atgatv2_model(
                 is_last = layer_index == len(self.convs) - 1
                 if return_attention_weights and is_last:
                     x, attention_weights = conv(x, data.edge_index, return_attention_weights=True)
+                elif self.training and self.activation_checkpointing:
+                    x = checkpoint(conv, x, data.edge_index, use_reentrant=False)
                 else:
                     x = conv(x, data.edge_index)
                 x = F.elu(x)
@@ -170,9 +175,11 @@ def build_model(
     type_embedding_dim: int = 16,
     readout: str = "mean",
     node_type_order: str = "legacy",
+    activation_checkpointing: bool = False,
 ):
     if model_type == "hgt":
         return build_hgt_model(metadata, hidden_channels, num_layers, heads, dropout)
     if model_type == "atgatv2":
-        return build_atgatv2_model(metadata, hidden_channels, num_layers, heads, dropout, type_embedding_dim, readout, node_type_order)
+        return build_atgatv2_model(metadata, hidden_channels, num_layers, heads, dropout,
+                                  type_embedding_dim, readout, node_type_order, activation_checkpointing)
     raise ValueError(f"未知图模型类型: {model_type}")

@@ -67,6 +67,7 @@ def save_best_checkpoint(torch, path: Path, state_dict, metadata, args) -> None:
             "type_embedding_dim": args.type_embedding_dim,
             "readout": args.readout,
             "node_type_order": "global" if args.model_type == "atgatv2" else "legacy",
+            "activation_checkpointing": getattr(args, "activation_checkpointing", False),
         },
         "train_args": vars(args),
     }
@@ -89,6 +90,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True, help="训练运行目录，例如 runs/hetero_gatv2")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--micro-batch-size", type=int, default=1,
+                        help="每次送入 GPU 的图数；梯度累积后仍按 --batch-size 更新一次参数")
+    parser.add_argument("--activation-checkpointing", action=argparse.BooleanOptionalAction, default=True,
+                        help="训练 ATGATv2 时重算注意力层中间结果以节省显存")
     parser.add_argument("--hidden-channels", type=int, default=96)
     parser.add_argument("--layers", type=int, default=2)
     parser.add_argument("--heads", type=int, default=4)
@@ -115,6 +120,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.batch_size < 1 or args.micro_batch_size < 1 or args.batch_size % args.micro_batch_size:
+        raise SystemExit("--batch-size 和 --micro-batch-size 必须为正数，且前者须为后者的整数倍")
     run_dir = Path(args.output)
     print("本次训练信息：",args.info)
     model_dir = run_dir / "models"
@@ -159,13 +166,13 @@ def main() -> None:
     node_types = metadata[0] if args.model_type == "atgatv2" else None
     train_loader = DataLoader(
         GraphDataset(samples, train_idx, data_format=data_format, node_types=node_types),
-        batch_size=args.batch_size,
+        batch_size=args.micro_batch_size,
         shuffle=True,
         **loader_kwargs,
     )
     val_loader = DataLoader(
         GraphDataset(samples, val_idx, data_format=data_format, node_types=node_types),
-        batch_size=args.batch_size,
+        batch_size=args.micro_batch_size,
         shuffle=False,
         **loader_kwargs,
     )
@@ -181,6 +188,7 @@ def main() -> None:
         type_embedding_dim=args.type_embedding_dim,
         readout=args.readout,
         node_type_order="global",
+        activation_checkpointing=args.activation_checkpointing,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = (
@@ -198,10 +206,20 @@ def main() -> None:
 
     # 开始训练模型
     print("开始训练模型")
+    batch_stats = {}
     try:
         for epoch in tqdm(range(1, args.epochs + 1)):
+            if device.startswith("cuda"):
+                torch.cuda.reset_peak_memory_stats(device)
             current_lr = optimizer.param_groups[0]["lr"]
-            train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights, args.grad_clip)
+            batch_stats = {}
+            train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights,
+                                         args.grad_clip, args.batch_size // args.micro_batch_size,
+                                         batch_stats=batch_stats)
+            peak_alloc_gb = (torch.cuda.max_memory_allocated(device) / 1024**3
+                             if device.startswith("cuda") else None)
+            peak_reserved_gb = (torch.cuda.max_memory_reserved(device) / 1024**3
+                                if device.startswith("cuda") else None)
             val_metrics = evaluate(model, val_loader, device, args.threshold)
             val_score = metric_for_best_model(val_metrics, "pr_auc")
             if scheduler is not None:
@@ -216,8 +234,16 @@ def main() -> None:
                     "val_f1_score": val_metrics["f1_score"],
                     "val_f1": val_metrics["f1"],
                     "lr": current_lr,
+                    "peak_allocated_gb": peak_alloc_gb,
+                    "peak_reserved_gb": peak_reserved_gb,
+                    "largest_batch": batch_stats,
                 }
             )
+            if peak_alloc_gb is not None:
+                print(f"  CUDA 峰值: allocated={peak_alloc_gb:.2f} GiB, reserved={peak_reserved_gb:.2f} GiB")
+            if batch_stats:
+                names = [str(samples[index].get("apk_name")) for index in batch_stats["sample_indices"]]
+                print(f"  最大图批次: nodes={batch_stats['max_nodes']}, edges={batch_stats['max_edges']}, APK={names}")
             print(
                 "epoch={epoch:03d} loss={loss:.4f} val_pr_auc={pr_auc} val_roc_auc={roc_auc} val_f1={f1}".format(
                     epoch=epoch,
@@ -240,6 +266,10 @@ def main() -> None:
                 if stale_epochs >= args.patience:
                     break
     except BaseException:
+        if batch_stats:
+            names = [str(samples[index].get("apk_name")) for index in batch_stats["sample_indices"]]
+            print(f"当前 epoch 最大图批次: nodes={batch_stats['max_nodes']}, "
+                  f"edges={batch_stats['max_edges']}, APK={names}", file=sys.stderr)
         if best_epoch is not None:
             print(f"训练中断；epoch {best_epoch} 的最佳模型已保存: {checkpoint_path}", file=sys.stderr)
         else:
@@ -274,6 +304,9 @@ def main() -> None:
         "model_filename": model_filename,
         "workers": worker_count,
         "prefetch_factor": args.prefetch_factor,
+        "effective_batch_size": args.batch_size,
+        "micro_batch_size": args.micro_batch_size,
+        "activation_checkpointing": args.activation_checkpointing,
         "metadata": {
             "node_types": metadata[0],
             "edge_types": [list(edge_type) for edge_type in metadata[1]],

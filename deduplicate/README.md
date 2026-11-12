@@ -6,9 +6,9 @@
 
 ```bash
 python -m deduplicate.audit_extraction \
-  --apk-root /data/android_apks \
-  --static-root /data/android_static \
-  --graph-root /data/android_graphs \
+  --apk-root /home/linux/7T/lzw/datasets/android_zoo/android_apks \
+  --static-root /home/linux/7T/lzw/datasets/android_zoo/android_static \
+  --graph-root /home/linux/7T/lzw/datasets/android_zoo/android_graphs \
   --split train
 ```
 

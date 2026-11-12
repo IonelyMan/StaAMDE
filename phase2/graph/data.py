@@ -43,12 +43,17 @@ def load_graph_meta(path: Path) -> Dict[str, object]:
 
 def to_homogeneous_graph(data, node_types: Optional[Sequence[str]] = None):
     if hasattr(data, "edge_index") and hasattr(data, "x"):
+        if hasattr(data, "edge_type"):
+            del data.edge_type
         return data
     local_types = list(data.node_types)
     try:
-        homogeneous = data.to_homogeneous(node_attrs=["x"], add_node_type=True, add_edge_type=True)
+        # ATGATv2 consumes node_type and edge_index, but never the per-edge type tensor.
+        homogeneous = data.to_homogeneous(node_attrs=["x"], add_node_type=True, add_edge_type=False)
     except TypeError:
         homogeneous = data.to_homogeneous()
+        if hasattr(homogeneous, "edge_type"):
+            del homogeneous.edge_type
     if node_types is not None:
         import torch
 

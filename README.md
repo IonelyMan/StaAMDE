@@ -42,6 +42,8 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 
 图训练默认使用 `mean_max` 图读出、从训练集估计的 `sqrt` 类别权重、验证 PR-AUC 驱动的学习率调整，以及梯度裁剪。训练目录同时存在 `train/` 和 `val/` 时会沿用已有划分，`test/` 不参与训练或图元数据收集。训练结果的 `metrics/train_metrics.json` 记录划分来源、训练类别数量、权重及最佳轮次。可用 `--class-weight none|sqrt|balanced` 和 `--readout mean|mean_max` 做验证集对照；新模型的推理与解释会从检查点读取读出及节点类型映射配置，旧模型仍使用原配置。
 
+图训练默认使用有效批次 8、GPU 微批次 1，并对 ATGATv2 注意力层启用激活重计算，以降低大图训练的显存峰值。`--micro-batch-size` 可调每次送入 GPU 的图数，须整除 `--batch-size`；显存充足时可调大以加快训练。`--no-activation-checkpointing` 可关闭激活重计算。日志及 `logs/history.json` 记录每轮 CUDA 峰值显存和最大图批次的节点、边数量及 APK 名称，可据此排查异常大图。
+
 
 
 ## 推理与集成
