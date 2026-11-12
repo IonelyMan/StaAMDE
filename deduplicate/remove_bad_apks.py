@@ -1,4 +1,4 @@
-"""Remove explicitly selected APKs and their phase1 static/graph outputs."""
+"""Discover failed APKs from phase1 outputs and remove their source and derived data."""
 
 import argparse
 import csv
@@ -6,9 +6,11 @@ import json
 import os
 import shutil
 import tempfile
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 SPLITS = {"train", "val", "test"}
@@ -63,13 +65,73 @@ def collect_targets(args: argparse.Namespace) -> list[Target]:
                 fail("清理清单 CSV 必须包含 split,label,apk_name 三列")
             targets.extend(target_from_fields(row["split"], row["label"], row["apk_name"])
                            for row in reader)
-    if not targets:
-        fail("请提供 --sample-id 或 --manifest，且目标不能为空")
     unique = list(dict.fromkeys(targets))
     directories = [(target.split, target.label, target.stem.casefold()) for target in unique]
     if len(directories) != len(set(directories)):
         fail("多个目标会写入同一个提取目录，请检查 APK 名称大小写及扩展名")
     return unique
+
+
+def discover_failed_targets(apk_root: Path, static_root: Path, graph_root: Path,
+                            split_filter: Optional[str], label_filter: Optional[str]) -> dict[Target, set[str]]:
+    """Use explicit extraction errors and invalid APK archives, never missing outputs alone."""
+    discovered: dict[Target, set[str]] = {}
+
+    def mark(split: str, label: str, apk_name: str, reason: str) -> None:
+        target = target_from_fields(split, label, apk_name)
+        discovered.setdefault(target, set()).add(reason)
+
+    splits = [split_filter] if split_filter else sorted(SPLITS)
+    labels = [LABELS[label_filter]] if label_filter else ["benign", "mal"]
+    for split in splits:
+        for label in labels:
+            apk_dir = checked_child(apk_root, split, label)
+            if apk_dir.exists() and not apk_dir.is_dir():
+                fail(f"原始 APK 分类路径不是目录: {apk_dir}")
+            if apk_dir.is_dir():
+                for apk in sorted(apk_dir.iterdir()):
+                    if apk.is_symlink():
+                        fail(f"原始 APK 目录含符号链接: {apk}")
+                    if apk.is_file() and apk.suffix.lower() == ".apk" and not zipfile.is_zipfile(apk):
+                        mark(split, label, apk.name, "APK 不是有效 ZIP")
+
+            static_dir = checked_child(static_root, split, label)
+            if static_dir.exists() and not static_dir.is_dir():
+                fail(f"静态结果分类路径不是目录: {static_dir}")
+            if static_dir.is_dir():
+                for sample_dir in sorted(static_dir.iterdir()):
+                    if sample_dir.is_symlink():
+                        fail(f"静态结果目录含符号链接: {sample_dir}")
+                    report_path = sample_dir / "static_features_report.json"
+                    if not sample_dir.is_dir() or not report_path.exists():
+                        continue
+                    if report_path.is_symlink():
+                        fail(f"静态报告是符号链接: {report_path}")
+                    try:
+                        report = json.loads(report_path.read_text(encoding="utf-8"))
+                    except (OSError, ValueError) as exc:
+                        mark(split, label, sample_dir.name + ".apk", f"静态报告无法读取: {exc}")
+                        continue
+                    if not isinstance(report, dict):
+                        mark(split, label, sample_dir.name + ".apk", "静态报告不是 JSON 对象")
+                    elif report.get("error"):
+                        mark(split, label, sample_dir.name + ".apk", f"静态提取失败: {report['error']}")
+
+        index = checked_child(graph_root, split, "index.csv")
+        if index.exists():
+            if not index.is_file():
+                fail(f"图索引路径不是文件: {index}")
+            _, rows = read_index(index)
+            for row in rows:
+                label = LABELS.get(str(row.get("label", "")).strip().lower())
+                if label is None or label not in labels:
+                    continue
+                row_split = (row.get("split") or row.get("belong") or "").strip().lower()
+                if row_split and row_split != split:
+                    fail(f"图索引行的划分与所在目录不符: {index}: {row.get('apk_name')}")
+                if str(row.get("status") or "").strip().lower() == "failed" or str(row.get("error") or "").strip():
+                    mark(split, label, row.get("apk_name") or "", f"图构建失败: {row.get('error') or row.get('status')}")
+    return discovered
 
 
 def checked_root(path: Path) -> Path:
@@ -110,7 +172,8 @@ def index_matches(row: dict[str, str], target: Target, index: Path) -> bool:
     return True
 
 
-def make_plan(targets: list[Target], apk_root: Path, static_root: Path, graph_root: Path):
+def make_plan(targets: list[Target], apk_root: Path, static_root: Path, graph_root: Path,
+              allow_missing_apk: bool = False):
     files = []
     directories = []
     index_updates = {}
@@ -118,9 +181,10 @@ def make_plan(targets: list[Target], apk_root: Path, static_root: Path, graph_ro
         apk = checked_child(apk_root, target.split, target.label, target.apk_name)
         static_dir = checked_child(static_root, target.split, target.label, target.stem)
         graph_dir = checked_child(graph_root, target.split, target.label, target.stem)
-        if not apk.is_file():
+        if not apk.is_file() and not allow_missing_apk:
             fail(f"找不到目标 APK，停止清理: {apk}")
-        files.append(apk)
+        if apk.is_file():
+            files.append(apk)
         for directory in (static_dir, graph_dir):
             if directory.exists():
                 if not directory.is_dir():
@@ -166,8 +230,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--apk-root", type=Path, required=True, help="原始 APK 数据根目录")
     parser.add_argument("--static-root", type=Path, required=True, help="静态特征报告根目录")
     parser.add_argument("--graph-root", type=Path, required=True, help="图数据根目录")
-    parser.add_argument("--split", choices=sorted(SPLITS), help="--sample-id 所属划分")
-    parser.add_argument("--label", choices=sorted(LABELS), help="--sample-id 所属标签")
+    parser.add_argument("--split", choices=sorted(SPLITS), help="自动扫描的划分；省略则扫描全部划分")
+    parser.add_argument("--label", choices=sorted(LABELS), help="自动扫描的标签；省略则扫描两类")
     parser.add_argument("--sample-id", nargs="+", action="append", default=[], help="APK 文件名或不带 .apk 的 ID；可重复指定")
     parser.add_argument("--manifest", type=Path, help="清理清单 CSV：split,label,apk_name；可跨划分")
     parser.add_argument("--audit-dir", type=Path, help="保存清理清单和原图索引的全新目录")
@@ -177,15 +241,31 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    targets = collect_targets(args)
     apk_root, static_root, graph_root = (checked_root(root) for root in
                                          (args.apk_root, args.static_root, args.graph_root))
     roots = (apk_root, static_root, graph_root)
     if len(set(roots)) != 3 or any(a in b.parents for a in roots for b in roots if a != b):
         fail("APK、静态数据、图数据根目录必须彼此独立")
-    files, directories, index_updates = make_plan(targets, apk_root, static_root, graph_root)
-    for target, apk in zip(targets, files):
-        print(f"{target.split}/{target.label}: {apk}")
+    automatic = not args.sample_id and not args.manifest
+    if automatic:
+        reasons = discover_failed_targets(apk_root, static_root, graph_root, args.split, args.label)
+        targets = sorted(reasons, key=lambda item: (item.split, item.label, item.apk_name))
+    else:
+        targets = collect_targets(args)
+        if not targets:
+            fail("指定的清理清单为空")
+        reasons = {target: {"手动指定"} for target in targets}
+    directories_by_name = [(target.split, target.label, target.stem.casefold()) for target in targets]
+    if len(directories_by_name) != len(set(directories_by_name)):
+        fail("多个错误记录对应同一个提取目录，请检查大小写冲突")
+    if not targets:
+        print("未发现明确的错误记录或无效 APK，未修改数据。")
+        return
+    files, directories, index_updates = make_plan(targets, apk_root, static_root, graph_root,
+                                                    allow_missing_apk=automatic)
+    for target in targets:
+        apk = checked_child(apk_root, target.split, target.label, target.apk_name)
+        print(f"{target.split}/{target.label}: {apk}；原因: {'；'.join(sorted(reasons[target]))}")
     for directory in directories:
         print(f"  删除提取目录: {directory}")
     for index, (_, rows) in index_updates.items():
@@ -202,7 +282,8 @@ def main() -> None:
         fail("审计目录必须位于三个数据根目录之外")
     audit.mkdir(parents=True)
     (audit / "targets.json").write_text(json.dumps(
-        [{"split": t.split, "label": t.label, "apk_name": t.apk_name} for t in targets],
+        [{"split": t.split, "label": t.label, "apk_name": t.apk_name,
+          "reasons": sorted(reasons[t])} for t in targets],
         ensure_ascii=False, indent=2), encoding="utf-8")
     for index in index_updates:
         shutil.copy2(index, audit / f"{index.parent.name}_index_before.csv")
@@ -215,7 +296,7 @@ def main() -> None:
             shutil.rmtree(directory)
     except OSError as exc:
         fail(f"清理中断，可能已部分执行；原图索引备份位于 {audit}: {exc}")
-    print(f"完成：删除 {len(files)} 个 APK、{len(directories)} 个提取目录；审计记录: {audit}")
+    print(f"完成：处理 {len(targets)} 个错误样本，删除 {len(files)} 个 APK、{len(directories)} 个提取目录；审计记录: {audit}")
 
 
 if __name__ == "__main__":
