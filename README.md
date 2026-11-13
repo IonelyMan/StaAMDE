@@ -24,8 +24,8 @@ PyTorch Geometric 的安装方式需与本机 PyTorch/CUDA 版本匹配。
 原始 APK 可按 `data/apks/{train,val,test}/{mal,benign}/` 放置。
 
 ```bash
-python phase1/static_feature_extract.py --dataset-root data/apks --belong train --output /home/linux/7T/lzw/datasets/android_zoo/android_static --workers 8
-python phase1/build_heterogeneous.py --dataset-root data/apks --belong train --output /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --workers 8
+nohup setsid python phase1/static_feature_extract.py --dataset-root /root/autodl-tmp/lzw/datasets/StaADME_dataset1/apks --belong test --output /root/autodl-tmp/lzw/datasets/StaADME_dataset1/android_static --workers 8 > logs/2.log 2>&1 &
+nohup setsid python phase1/build_heterogeneous.py --dataset-root /root/autodl-tmp/lzw/datasets/StaADME_dataset1/apks --belong test --output /root/autodl-tmp/lzw/datasets/StaADME_dataset1/android_graphs --workers 16 > logs/3.log 2>&1 &
 
 对 `val` 和 `test` 重复前两条提取命令。静态报告与异构图分别由各自模型读取。
 ```

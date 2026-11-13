@@ -3,9 +3,9 @@
 LOGDIR="runs/lightgbm/$(date +%m-%d_%H-%M)"
 LOG="$LOGDIR/train.log" # 月日+时分秒
 mkdir -p "$LOGDIR"
-INPUT_DIR="/home/linux/7T/lzw/datasets/android_zoo/android_static"
+INPUT_DIR="/root/autodl-tmp/lzw/datasets/StaADME_dataset1/android_static"
 
-nohup python3 -u /home/linux/7T/lzw/projects/multimodel_malware_detection/phase2/lightgbm/train.py \
+nohup python3 -u phase2/lightgbm/train.py \
   --input "$INPUT_DIR" \
   --output "$LOGDIR" \
   --workers 12 \

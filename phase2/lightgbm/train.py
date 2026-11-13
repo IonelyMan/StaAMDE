@@ -170,3 +170,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    # 训练lightgbm模型，无需使用GPU，使用CPU即可。

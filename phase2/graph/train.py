@@ -201,7 +201,7 @@ def main() -> None:
     best_epoch = None
     stale_epochs = 0
     history = []
-    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "gatv2_model.pt"
+    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "atgatv2_model.pt"
     checkpoint_path = model_dir / model_filename
 
     # 开始训练模型

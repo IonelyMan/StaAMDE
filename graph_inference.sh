@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 
-INPUT_DIR="${GRAPH_INPUT_DIR:-/home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs}"
-MODEL_PATH="${GRAPH_MODEL_PATH:-runs/graph/07-03_15-37_best/models/gatv2_model.pt}"
+INPUT_DIR="${GRAPH_INPUT_DIR:-/root/autodl-tmp/lzw/datasets/StaADME_dataset1/android_graphs}"
+MODEL_PATH="${GRAPH_MODEL_PATH:-runs/graph/11-13_00-28-48/models/atgatv2_model.pt}"
 SPLIT="${GRAPH_SPLIT:-val}"
 mkdir -p inference/atgatv2
 nohup python3 -m phase2.graph.inference \

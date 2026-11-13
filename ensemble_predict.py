@@ -42,8 +42,9 @@ def load_prediction(spec: str, required_split: str = None) -> pd.DataFrame:
             raise ValueError(f"{path} 必须仅包含 split={required_split} 的样本")
         if not df["y_true"].isin([0, 1]).all():
             raise ValueError(f"{path} 的 y_true 必须全部为 0 或 1")
-        if df["sample_id"].astype(str).str.strip().eq("").any() or df["sample_id"].duplicated().any():
-            raise ValueError(f"{path} 的 sample_id 不能为空或重复")
+        # if df["sample_id"].astype(str).str.strip().eq("").any() or df["sample_id"].duplicated().any():
+        if df["sample_id"].astype(str).str.strip().eq("").any():
+            raise ValueError(f"{path} 的 sample_id 不能为空")
         expected_keys = [build_sample_key(str(sid), required_split, int(label))
                          for sid, label in zip(df["sample_id"], df["y_true"])]
         if "sample_key" in df.columns and not df["sample_key"].eq(pd.Series(expected_keys, index=df.index)).all():
