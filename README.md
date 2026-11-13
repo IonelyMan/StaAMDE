@@ -40,7 +40,7 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 注意修改参数
 ```
 
-图训练默认使用 `mean_max` 图读出、从训练集估计的 `sqrt` 类别权重、验证 PR-AUC 驱动的学习率调整，以及梯度裁剪。训练目录同时存在 `train/` 和 `val/` 时会沿用已有划分，`test/` 不参与训练或图元数据收集。训练结果的 `metrics/train_metrics.json` 记录划分来源、训练类别数量、权重及最佳轮次。可用 `--class-weight none|sqrt|balanced` 和 `--readout mean|mean_max` 做验证集对照；新模型的推理与解释会从检查点读取读出及节点类型映射配置，旧模型仍使用原配置。
+图训练默认使用训练集类别频数的反比作为交叉熵权重，让少数类获得更大的损失权重；权重按训练样本的平均值归一化，验证集和测试集不参与计算。可使用 `--class-weight sqrt` 减弱加权，或使用 `--class-weight none` 关闭加权。训练日志与 `metrics/train_metrics.json` 记录训练类别数量和权重；训练集须同时包含良性和恶意样本。其他默认配置仍为全图均值读出、固定学习率和不裁剪梯度；已有的 `train/`、`val/` 划分保持不变。后续检查点仍记录模型配置，推理与解释可读取旧模型以及此前生成的不同配置模型。
 
 图训练默认使用有效批次 8、GPU 微批次 1，并对 ATGATv2 注意力层启用激活重计算，以降低大图训练的显存峰值。`--micro-batch-size` 可调每次送入 GPU 的图数，须整除 `--batch-size`；显存充足时可调大以加快训练。`--no-activation-checkpointing` 可关闭激活重计算。日志及 `logs/history.json` 记录每轮 CUDA 峰值显存和最大图批次的节点、边数量及 APK 名称，可据此排查异常大图。
 
@@ -50,15 +50,15 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 
 ```bash
 python -m phase2.lightgbm.inference --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/static_lgbm/models --output inference/lightgbm --split test
-python -m phase2.graph.inference --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
+python -m phase2.graph.inference --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --model-path runs/hetero_gatv2/models/atgatv2_model.pt --output inference/atgatv2 --split test
 python ensemble_predict.py --input static=inference/lightgbm/predictions/test_predictions.csv --input graph=inference/atgatv2/predictions/test_predictions.csv --output ensemble
 ```
 
 模型类型参数现统一为 `atgatv2`，目录名不影响模型加载。
 
-训练期间图模型每次刷新验证集最佳指标都会更新 `models/gatv2_model.pt`（HGT 为 `hgt_model.pt`）；LightGBM 会写出包含模型及特征映射的 `models/best_checkpoint.joblib`。若后续轮次报错，已完成验证的最佳检查点可继续用于推理和解释；成功训练后 LightGBM 仍保存原有模型文件。尚未完成首轮验证时无法生成本次训练的最佳检查点。
+训练期间图模型每次刷新验证集最佳指标都会更新 `models/atgatv2_model.pt`（HGT 为 `hgt_model.pt`）；LightGBM 会写出包含模型及特征映射的 `models/best_checkpoint.joblib`。若后续轮次报错，已完成验证的最佳检查点可继续用于推理和解释；成功训练后 LightGBM 仍保存原有模型文件。尚未完成首轮验证时无法生成本次训练的最佳检查点。
 
-集成结果在 `ensemble/ensemble_predictions.csv`。输入 CSV 需要包含 `sample_key`，或者包含可构造该键的 `sample_id,split,y_true`。同一 APK 在两个分支的键必须一致。
+集成结果在 `ensemble/ensemble_predictions.csv`。输入 CSV 需要包含 `sample_key`，或者包含可构造该键的 `sample_id,split,y_true`。两个分支只按 `sample_key`（划分、标签、样本 ID）对齐；不同划分或类别允许重用 `sample_id`。无法对齐的记录会提示并排除；同一分支内重复的 `sample_key` 仍需先排查，不能按行号配对。
 
 如需自动搜索权重或阈值，请先使用两个分支分别生成 `--split val` 的预测，再用独立验证集调参、测试集评估：
 
@@ -71,7 +71,7 @@ python ensemble_predict.py \
   --tune-weights --tune-threshold --output ensemble
 ```
 
-调参时输入必须分别标记为 `test` 和 `val`，且两个集合的 `sample_id` 不能重叠。没有验证集时请使用固定的权重和阈值，不要启用搜索。此前在测试集上搜索得到的权重、阈值和指标不能作为无泄漏的测试结果。
+调参时输入必须分别标记为 `test` 和 `val`；两个集合可以有相同的 `sample_id`，但必须使用独立的 APK 样本。没有验证集时请使用固定的权重和阈值，不要启用搜索。此前在测试集上搜索得到的权重、阈值和指标不能作为无泄漏的测试结果。
 
 错误 APK 及其静态报告、图数据的按划分清理工具见 [deduplicate/README.md](deduplicate/README.md)。
 

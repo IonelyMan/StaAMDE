@@ -64,7 +64,9 @@ class TrainingCheckpointTests(unittest.TestCase):
                 save_best_checkpoint(FailingTorch, path, {"weight": 2}, (["api"], []), args)
             self.assertEqual(path.read_bytes(), original)
             with path.open("rb") as handle:
-                self.assertEqual(pickle.load(handle)["state_dict"], {"weight": 1})
+                saved = pickle.load(handle)
+                self.assertEqual(saved["state_dict"], {"weight": 1})
+                self.assertEqual(saved["model_config"]["node_type_order"], "legacy")
 
 
 if __name__ == "__main__":

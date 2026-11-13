@@ -60,24 +60,44 @@ class EnsembleLeakageTests(unittest.TestCase):
         with self.assertRaises((ValueError, SystemExit)):
             self.run_main("--tune-weights", *self.tuning_args(missing, self.val_graph))
 
-    def test_rejects_overlapping_validation_and_test_id(self):
+    def test_allows_same_sample_id_in_validation_and_test(self):
         ids = ["test-negative", "val-positive"]
         val_static = self.write("overlap_static", "val", [0.1, 0.9], ids=ids)
         val_graph = self.write("overlap_graph", "val", [0.1, 0.9], ids=ids)
-        with self.assertRaises((ValueError, SystemExit)):
-            self.run_main("--tune-threshold", *self.tuning_args(val_static, val_graph))
+        self.run_main("--tune-threshold", *self.tuning_args(val_static, val_graph))
+        metrics = json.loads((self.output / "ensemble_metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual(metrics["tuning"]["n_samples"], 2)
 
-    def test_rejects_overlap_even_when_missing_from_other_branch(self):
+    def test_unmatched_validation_sample_id_is_excluded(self):
         ids = ["test-negative", "val-negative", "val-positive"]
         val_static = self.write("partial_overlap", "val", [0.2, 0.1, 0.9],
                                 ids=ids, labels=[0, 0, 1])
-        with self.assertRaises((ValueError, SystemExit)):
-            self.run_main("--tune-threshold", *self.tuning_args(val_static, self.val_graph))
+        self.run_main("--tune-threshold", *self.tuning_args(val_static, self.val_graph))
+        metrics = json.loads((self.output / "ensemble_metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual(metrics["tuning"]["n_samples"], 2)
 
-    def test_rejects_labels_disagreeing_between_branches(self):
+    def test_rejects_when_no_sample_key_can_align(self):
         graph = self.write("conflict", "val", [0.9, 0.1], labels=[1, 0])
-        with self.assertRaises((ValueError, SystemExit)):
+        with self.assertRaisesRegex(ValueError, "没有可对齐的 sample_key"):
             self.run_main("--tune-weights", *self.tuning_args(self.val_static, graph))
+
+    def test_same_id_with_different_labels_within_one_split_can_align(self):
+        static = self.write("two_labels_static", "val", [0.1, 0.9], ids=["same", "same"])
+        graph = self.write("two_labels_graph", "val", [0.2, 0.8], ids=["same", "same"])
+        merged, _ = ensemble_predict.merge_predictions(
+            [f"static={static}", f"graph={graph}"], required_split="val")
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(set(merged["y_true"]), {0, 1})
+
+    def test_conflicting_label_for_same_id_only_excludes_that_key(self):
+        ids = ["same", "benign", "mal"]
+        static = self.write("partial_conflict_static", "val", [0.1, 0.2, 0.8],
+                            ids=ids, labels=[0, 0, 1])
+        graph = self.write("partial_conflict_graph", "val", [0.9, 0.3, 0.7],
+                           ids=ids, labels=[1, 0, 1])
+        self.run_main("--tune-weights", *self.tuning_args(static, graph))
+        metrics = json.loads((self.output / "ensemble_metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual(metrics["tuning"]["n_samples"], 2)
 
     def test_tunes_on_validation_and_outputs_only_test(self):
         self.run_main("--tune-weights", "--tune-threshold", *self.tuning_args())

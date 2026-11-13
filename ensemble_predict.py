@@ -1,7 +1,6 @@
 import argparse
 import itertools
 import json
-from functools import reduce
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -42,7 +41,6 @@ def load_prediction(spec: str, required_split: str = None) -> pd.DataFrame:
             raise ValueError(f"{path} 必须仅包含 split={required_split} 的样本")
         if not df["y_true"].isin([0, 1]).all():
             raise ValueError(f"{path} 的 y_true 必须全部为 0 或 1")
-        # if df["sample_id"].astype(str).str.strip().eq("").any() or df["sample_id"].duplicated().any():
         if df["sample_id"].astype(str).str.strip().eq("").any():
             raise ValueError(f"{path} 的 sample_id 不能为空")
         expected_keys = [build_sample_key(str(sid), required_split, int(label))
@@ -61,9 +59,11 @@ def load_prediction(spec: str, required_split: str = None) -> pd.DataFrame:
             for sample_id, split, label in zip(df["sample_id"], df["split"], df["y_true"])
         ]
 
+    if df["sample_key"].isna().any() or df["sample_key"].astype(str).str.strip().eq("").any():
+        raise ValueError(f"{path} 的 sample_key 不能为空")
     if df["sample_key"].duplicated().any():
         duplicated = df.loc[df["sample_key"].duplicated(), "sample_key"].head(5).tolist()
-        raise ValueError(f"{path} 存在重复 sample_key，无法可靠集成: {duplicated}")
+        raise ValueError(f"{path} 存在重复 sample_key（同一 split、标签及 sample_id），无法可靠集成: {duplicated}")
 
     keep = ["sample_key", "prob_malware"]
     optional = [col for col in ["apk_name", "split", "y_true"] if col in df.columns]
@@ -77,22 +77,12 @@ def load_prediction(spec: str, required_split: str = None) -> pd.DataFrame:
     return df
 
 
-def merge_predictions(inputs: List[str], required_split: str = None,
-                      source_sample_ids: set = None) -> Tuple[pd.DataFrame, List[str]]:
+def merge_predictions(inputs: List[str], required_split: str = None) -> Tuple[pd.DataFrame, List[str]]:
     names = [parse_named_path(spec)[0] for spec in inputs]
     if len(names) != 2 or set(names) != {"static", "graph"}:
         raise ValueError("必须分别提供一个 static 和一个 graph 预测 CSV")
     frames = [load_prediction(spec, required_split=required_split) for spec in inputs]
-    if required_split is not None:
-        if source_sample_ids is not None:
-            for name, frame in zip(names, frames):
-                source_sample_ids.update(frame[f"sample_id_{name}"].astype(str))
-        left, right = frames
-        paired = pd.merge(left, right, left_on=f"sample_id_{names[0]}",
-                          right_on=f"sample_id_{names[1]}", how="inner")
-        if not paired[f"y_true_{names[0]}"].eq(paired[f"y_true_{names[1]}"]).all():
-            raise ValueError(f"split={required_split} 两个分支存在相同 sample_id 但标签不一致")
-    merged = reduce(lambda left, right: pd.merge(left, right, on="sample_key", how="inner"), frames)
+    merged = pd.merge(frames[0], frames[1], on="sample_key", how="inner", validate="one_to_one")
     if merged.empty:
         raise ValueError("各模态没有可对齐的 sample_key，请检查 predictions.csv")
     for name, frame in zip(names, frames):
@@ -105,10 +95,11 @@ def merge_predictions(inputs: List[str], required_split: str = None,
     apk_cols = [col for col in merged.columns if col.startswith("apk_name_")]
     split_cols = [col for col in merged.columns if col.startswith("split_")]
     label_cols = [col for col in merged.columns if col.startswith("y_true_")]
-    if required_split is not None:
-        for columns in (sample_id_cols, split_cols, label_cols):
-            if len(columns) != 2 or not merged[columns[0]].eq(merged[columns[1]]).all():
-                raise ValueError(f"两个分支的样本身份、划分或标签不一致: {columns}")
+    for columns in (sample_id_cols, split_cols, label_cols):
+        if required_split is not None and len(columns) != 2:
+            raise ValueError(f"调参输入缺少两个分支的样本身份、划分或标签: {columns}")
+        if len(columns) == 2 and not merged[columns[0]].eq(merged[columns[1]]).all():
+            raise ValueError(f"两个分支的样本身份、划分或标签不一致: {columns}")
     if sample_id_cols:
         merged["sample_id"] = merged[sample_id_cols].bfill(axis=1).iloc[:, 0]
     if apk_cols:
@@ -258,17 +249,12 @@ def main() -> None:
         raise SystemExit("提供 --tune-input 时必须启用 --tune-weights 或 --tune-threshold")
     output_dir = Path(args.output)
 
-    test_ids = set()
-    merged, names = merge_predictions(args.input, required_split="test" if tuning else None,
-                                      source_sample_ids=test_ids)
+    merged, names = merge_predictions(args.input, required_split="test" if tuning else None)
     validation = None
     if tuning:
-        validation_ids = set()
-        validation, validation_names = merge_predictions(args.tune_input, required_split="val",
-                                                         source_sample_ids=validation_ids)
+        validation, validation_names = merge_predictions(args.tune_input, required_split="val")
         if set(validation_names) != set(names):
             raise ValueError("验证集和测试集的模型分支不一致")
-        overlap = test_ids & validation_ids
         if validation["y_true"].nunique() != 2:
             raise ValueError("验证集必须同时包含良性和恶性样本，才能进行调参")
     weights = parse_weights(args.weights, names)

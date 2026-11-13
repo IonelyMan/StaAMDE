@@ -66,7 +66,7 @@ def save_best_checkpoint(torch, path: Path, state_dict, metadata, args) -> None:
             "model_type": args.model_type,
             "type_embedding_dim": args.type_embedding_dim,
             "readout": args.readout,
-            "node_type_order": "global" if args.model_type == "atgatv2" else "legacy",
+            "node_type_order": "legacy",
             "activation_checkpointing": getattr(args, "activation_checkpointing", False),
         },
         "train_args": vars(args),
@@ -100,12 +100,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dropout", type=float, default=0.25)
     parser.add_argument("--model-type", default="atgatv2", choices=["atgatv2", "hgt"])
     parser.add_argument("--type-embedding-dim", type=int, default=16, help="ATGATv2 同构图中的节点类型嵌入维度，0 则退化为标准 GATv2")
-    parser.add_argument("--readout", choices=["mean", "mean_max"], default="mean_max", help="图级读出；mean_max 可保留少量高响应节点信号")
+    parser.add_argument("--readout", choices=["mean", "mean_max"], default="mean", help="图级读出；默认沿用原来的全图均值")
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--class-weight", choices=["none", "sqrt", "balanced"], default="sqrt", help="只根据训练集类别频数计算损失权重")
-    parser.add_argument("--grad-clip", type=float, default=2.0, help="梯度范数裁剪阈值；0 表示禁用")
-    parser.add_argument("--lr-scheduler", choices=["none", "plateau"], default="plateau", help="验证指标停滞时降低学习率")
+    parser.add_argument("--class-weight", choices=["none", "sqrt", "balanced"], default="balanced", help="按训练集类别频数计算损失权重；balanced 为反频率，sqrt 更温和，none 禁用")
+    parser.add_argument("--grad-clip", type=float, default=0.0, help="梯度范数裁剪阈值；默认 0 表示禁用")
+    parser.add_argument("--lr-scheduler", choices=["none", "plateau"], default="none", help="默认不调整学习率")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--val-size", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
@@ -154,7 +154,7 @@ def main() -> None:
     train_counts, weight_values = training_class_weights(labels, train_idx, args.class_weight)
     print(f"划分来源={split_source}，训练类别计数={train_counts}，类别权重={weight_values}")
     print("扫描图元数据")
-    metadata = collect_metadata([samples[i] for i in list(train_idx) + list(val_idx)], workers=worker_count)
+    metadata = collect_metadata(samples, workers=worker_count)
 
     device = "cuda:0" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
@@ -163,7 +163,7 @@ def main() -> None:
 
     loader_kwargs = dataloader_kwargs(worker_count, args.prefetch_factor)
     data_format = "heterogeneous" if args.model_type == "hgt" else "homogeneous"
-    node_types = metadata[0] if args.model_type == "atgatv2" else None
+    node_types = None
     train_loader = DataLoader(
         GraphDataset(samples, train_idx, data_format=data_format, node_types=node_types),
         batch_size=args.micro_batch_size,
@@ -187,7 +187,7 @@ def main() -> None:
         model_type=args.model_type,
         type_embedding_dim=args.type_embedding_dim,
         readout=args.readout,
-        node_type_order="global",
+        node_type_order="legacy",
         activation_checkpointing=args.activation_checkpointing,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -282,7 +282,7 @@ def main() -> None:
     print("评估模型")
     train_metrics = evaluate(model, train_loader, device, args.threshold)
     val_metrics = evaluate(model, val_loader, device, args.threshold)
-    # 沿用 gatv2_model.pt 文件名，避免重命名已有模型文件；嵌入维度为 0 时对应标准 GATv2。
+    # 节点类型嵌入维度为 0 时对应标准 GATv2。
     summary = {
         "train": train_metrics,
         "val": val_metrics,
@@ -295,7 +295,7 @@ def main() -> None:
         "class_weight_mode": args.class_weight,
         "class_weights": weight_values,
         "readout": args.readout if args.model_type == "atgatv2" else "app",
-        "node_type_order": "global" if args.model_type == "atgatv2" else None,
+        "node_type_order": "legacy" if args.model_type == "atgatv2" else None,
         "best_epoch": best_epoch,
         "threshold": float(args.threshold),
         "best_model_metric": "pr_auc",

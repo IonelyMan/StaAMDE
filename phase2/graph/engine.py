@@ -15,29 +15,25 @@ def train_one_epoch(model, loader, optimizer, device, class_weights=None,
     total_loss = 0.0
     total_graphs = 0
     group_loss = None
-    group_normalizer = 0.0
     group_graphs = 0
     pending = 0
     optimizer.zero_grad(set_to_none=True)
 
     def finish_group():
-        nonlocal total_loss, total_graphs, group_loss, group_normalizer, group_graphs, pending
+        nonlocal total_loss, total_graphs, group_loss, group_graphs, pending
         if not pending:
             return
         for parameter in model.parameters():
             if parameter.grad is not None:
-                parameter.grad.div_(group_normalizer)
+                parameter.grad.div_(group_graphs)
         if grad_clip > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
-        total_loss += float(group_loss) / group_normalizer * group_graphs
+        total_loss += float(group_loss)
         total_graphs += group_graphs
         group_loss = None
-        group_normalizer = 0.0
         group_graphs = pending = 0
-
-    weight_values = class_weights.detach().cpu().tolist() if class_weights is not None else None
 
     for batch in loader:
         if batch_stats is not None:
@@ -49,15 +45,12 @@ def train_one_epoch(model, loader, optimizer, device, class_weights=None,
                     "max_nodes": int(getattr(batch, "num_nodes", 0)),
                     "sample_indices": sample_idx.view(-1).tolist() if sample_idx is not None else [],
                 })
-        batch_labels = batch.y.view(-1).tolist()
         batch = batch.to(device)
         logits = model(batch)
         labels = batch.y.view(-1)
         loss_sum = F.cross_entropy(logits, labels, weight=class_weights, reduction="sum")
         loss_sum.backward()
         group_loss = loss_sum.detach() if group_loss is None else group_loss + loss_sum.detach()
-        group_normalizer += (sum(weight_values[int(label)] for label in batch_labels)
-                             if weight_values is not None else len(batch_labels))
         group_graphs += int(labels.numel())
         pending += 1
         del batch, logits, loss_sum, labels

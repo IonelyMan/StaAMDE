@@ -1,14 +1,26 @@
 import tempfile
 import unittest
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
 from phase2.graph.data import global_node_type_ids, load_train_val_samples, split_indices_auto
-from phase2.graph.train import training_class_weights
+from phase2.graph.train import parse_args, training_class_weights
 
 
 class GraphTrainingDataTests(unittest.TestCase):
+    def test_training_defaults(self):
+        with patch.object(sys, "argv", ["train", "--output", "unused"]):
+            args = parse_args()
+        self.assertEqual(args.readout, "mean")
+        self.assertEqual(args.class_weight, "balanced")
+        self.assertEqual(args.lr_scheduler, "none")
+        self.assertEqual(args.grad_clip, 0.0)
+        self.assertEqual(args.lr, 0.001)
+        self.assertEqual(args.dropout, 0.25)
+
     def test_existing_splits_exclude_test_and_class_weights_use_train_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

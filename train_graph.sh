@@ -14,12 +14,7 @@ nohup python3 -u phase2/graph/train.py \
   --model-type "atgatv2" \
   --workers 12 \
   --type-embedding-dim 16 \
-  --readout mean_max \
-  --class-weight sqrt \
-  --lr-scheduler none \
-  --grad-clip 2 \
-  --patience 18 \
-  --info "ATGATv2：全局节点类型映射、均值和最大值读出、训练集类别权重" \
+  --info "ATGATv2：使用训练集类别权重；保留显存优化" \
   --output "$LOGDIR" > "$LOG" 2>&1 &
 
 echo $!
