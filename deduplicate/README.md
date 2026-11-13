@@ -1,5 +1,29 @@
 # 自动清理错误 APK 及提取结果
 
+## 清理缺少图边索引的样本
+
+在训练所用的 PyTorch、PyTorch Geometric 环境中，先扫描图文件并生成清单：
+
+```bash
+python -m deduplicate.find_missing_graph_edges \
+  --graph-root /home/linux/7T/lzw/datasets/CICMalDroid2020/2_1/android_graphs \
+  --split train --output missing_graph_edges.csv
+```
+
+扫描按图训练的同构转换检查 `edge_index is None`，只检查 `train/benign/<ID>/` 和 `train/mal/<ID>/` 下训练支持的图文件；省略 `--split` 可扫描 train、val、test。同一目录有两个图文件时按目录训练的优先级选择，使用自定义索引训练时路径可能不同。空边张量不是缺失索引，不会列入清单。扫描失败时需先排查错误，不能将失败样本自动视为待删除样本。
+
+再使用同一清单预览清理，以下 APK 和静态数据路径应替换为实际路径：
+
+```bash
+python -m deduplicate.remove_bad_apks \
+  --apk-root /实际路径/android_apks \
+  --static-root /实际路径/android_static \
+  --graph-root /home/linux/7T/lzw/datasets/CICMalDroid2020/2_1/android_graphs \
+  --manifest missing_graph_edges.csv
+```
+
+检查预览后在命令末尾加 `--apply` 执行。工具要求 APK 位于 `APK根目录/split/label/ID.apk`，按 `split/label/ID` 删除对应 APK 和静态、图样本目录，并更新 `图根目录/split/index.csv`；会备份原图索引和清单，但不会备份被删除的 APK 或提取结果。仅支持以上目录结构，其他集中式表格或索引不会自动修改。图缺边可能由提取失败造成，如需保留 APK，请先检查或重新提取；此清理操作会删除 APK。
+
 ## 先排查数量差异
 
 原始 APK 比 train 的提取结果多时，先运行只读对账脚本：
