@@ -1,9 +1,7 @@
 import argparse
 import json
-import os
 import random
 import sys
-import tempfile
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
@@ -33,54 +31,16 @@ def dataloader_kwargs(worker_count: int, prefetch_factor: int) -> dict:
     }
 
 
-def training_class_weights(labels: np.ndarray, train_idx, mode: str):
-    """Compute loss weights from training labels only; keep mean sample weight at 1."""
+def training_class_weights(labels: np.ndarray, train_idx):
+    """Return binary class counts and inverse-frequency weights from the training split."""
     train_labels = labels[np.asarray(train_idx, dtype=np.int64)]
     if not np.isin(train_labels, [0, 1]).all():
         raise ValueError("图分类只支持标签 0（良性）和 1（恶意）")
     counts = np.bincount(train_labels, minlength=2)
     if (counts == 0).any():
-        raise ValueError(f"训练集必须同时包含良性和恶意样本，当前类别计数: {counts.tolist()}")
-    if mode == "none":
-        return counts.tolist(), None
+        raise ValueError(f"计算类别权重需要训练集同时包含两类样本，当前类别计数: {counts.tolist()}")
     weights = counts.sum() / (2.0 * counts.astype(np.float64))
-    if mode == "sqrt":
-        weights = np.sqrt(weights)
-    elif mode != "balanced":
-        raise ValueError(f"未知类别权重模式: {mode}")
-    weights /= float(np.dot(counts, weights) / counts.sum())
     return counts.tolist(), weights.tolist()
-
-
-def save_best_checkpoint(torch, path: Path, state_dict, metadata, args) -> None:
-    """Atomically replace the last validated best model."""
-    payload = {
-        "state_dict": state_dict,
-        "metadata": metadata,
-        "model_type": args.model_type,
-        "model_config": {
-            "hidden_channels": args.hidden_channels,
-            "layers": args.layers,
-            "heads": args.heads,
-            "dropout": args.dropout,
-            "model_type": args.model_type,
-            "type_embedding_dim": args.type_embedding_dim,
-            "readout": args.readout,
-            "node_type_order": "legacy",
-            "activation_checkpointing": getattr(args, "activation_checkpointing", False),
-        },
-        "train_args": vars(args),
-    }
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".graph-best-", suffix=".pt",
-                                         delete=False) as handle:
-            temporary = Path(handle.name)
-        torch.save(payload, temporary)
-        os.replace(temporary, path)
-    finally:
-        if temporary is not None and temporary.exists():
-            temporary.unlink()
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,22 +50,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True, help="训练运行目录，例如 runs/hetero_gatv2")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=8)
-    parser.add_argument("--micro-batch-size", type=int, default=1,
-                        help="每次送入 GPU 的图数；梯度累积后仍按 --batch-size 更新一次参数")
-    parser.add_argument("--activation-checkpointing", action=argparse.BooleanOptionalAction, default=True,
-                        help="训练 ATGATv2 时重算注意力层中间结果以节省显存")
     parser.add_argument("--hidden-channels", type=int, default=96)
     parser.add_argument("--layers", type=int, default=2)
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--dropout", type=float, default=0.25)
     parser.add_argument("--model-type", default="atgatv2", choices=["atgatv2", "hgt"])
     parser.add_argument("--type-embedding-dim", type=int, default=16, help="ATGATv2 同构图中的节点类型嵌入维度，0 则退化为标准 GATv2")
-    parser.add_argument("--readout", choices=["mean", "mean_max"], default="mean", help="图级读出；默认沿用原来的全图均值")
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--class-weight", choices=["none", "sqrt", "balanced"], default="balanced", help="按训练集类别频数计算损失权重；balanced 为反频率，sqrt 更温和，none 禁用")
-    parser.add_argument("--grad-clip", type=float, default=0.0, help="梯度范数裁剪阈值；默认 0 表示禁用")
-    parser.add_argument("--lr-scheduler", choices=["none", "plateau"], default="none", help="默认不调整学习率")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--val-size", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
@@ -120,8 +72,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if args.batch_size < 1 or args.micro_batch_size < 1 or args.batch_size % args.micro_batch_size:
-        raise SystemExit("--batch-size 和 --micro-batch-size 必须为正数，且前者须为后者的整数倍")
     run_dir = Path(args.output)
     print("本次训练信息：",args.info)
     model_dir = run_dir / "models"
@@ -151,28 +101,27 @@ def main() -> None:
         args.val_size,
         args.seed,
     )
-    train_counts, weight_values = training_class_weights(labels, train_idx, args.class_weight)
-    print(f"划分来源={split_source}，训练类别计数={train_counts}，类别权重={weight_values}")
+    train_counts, weight_values = training_class_weights(labels, train_idx)
+    print(f"训练类别计数={train_counts}，类别权重={weight_values}（顺序：良性、恶意）")
     print("扫描图元数据")
     metadata = collect_metadata(samples, workers=worker_count)
 
     device = "cuda:0" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
         device = "cpu"
-    class_weights = torch.tensor(weight_values, dtype=torch.float32, device=device) if weight_values is not None else None
+    class_weights = torch.tensor(weight_values, dtype=torch.float32, device=device)
 
     loader_kwargs = dataloader_kwargs(worker_count, args.prefetch_factor)
     data_format = "heterogeneous" if args.model_type == "hgt" else "homogeneous"
-    node_types = None
     train_loader = DataLoader(
-        GraphDataset(samples, train_idx, data_format=data_format, node_types=node_types),
-        batch_size=args.micro_batch_size,
+        GraphDataset(samples, train_idx, data_format=data_format),
+        batch_size=args.batch_size,
         shuffle=True,
         **loader_kwargs,
     )
     val_loader = DataLoader(
-        GraphDataset(samples, val_idx, data_format=data_format, node_types=node_types),
-        batch_size=args.micro_batch_size,
+        GraphDataset(samples, val_idx, data_format=data_format),
+        batch_size=args.batch_size,
         shuffle=False,
         **loader_kwargs,
     )
@@ -186,95 +135,49 @@ def main() -> None:
         args.dropout,
         model_type=args.model_type,
         type_embedding_dim=args.type_embedding_dim,
-        readout=args.readout,
-        node_type_order="legacy",
-        activation_checkpointing=args.activation_checkpointing,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = (
-        torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=4, min_lr=1e-5)
-        if args.lr_scheduler == "plateau" else None
-    )
 
     best_val_score = -1.0
     best_state = None
-    best_epoch = None
     stale_epochs = 0
     history = []
-    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "atgatv2_model.pt"
-    checkpoint_path = model_dir / model_filename
 
     # 开始训练模型
     print("开始训练模型")
-    batch_stats = {}
-    try:
-        for epoch in tqdm(range(1, args.epochs + 1)):
-            if device.startswith("cuda"):
-                torch.cuda.reset_peak_memory_stats(device)
-            current_lr = optimizer.param_groups[0]["lr"]
-            batch_stats = {}
-            train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights,
-                                         args.grad_clip, args.batch_size // args.micro_batch_size,
-                                         batch_stats=batch_stats)
-            peak_alloc_gb = (torch.cuda.max_memory_allocated(device) / 1024**3
-                             if device.startswith("cuda") else None)
-            peak_reserved_gb = (torch.cuda.max_memory_reserved(device) / 1024**3
-                                if device.startswith("cuda") else None)
-            val_metrics = evaluate(model, val_loader, device, args.threshold)
-            val_score = metric_for_best_model(val_metrics, "pr_auc")
-            if scheduler is not None:
-                scheduler.step(val_score)
-            history.append(
-                {
-                    "epoch": epoch,
-                    "train_loss": train_loss,
-                    "val_pr_auc": val_metrics["pr_auc"],
-                    "val_roc_auc": val_metrics["roc_auc"],
-                    "val_auc": val_metrics["roc_auc"],
-                    "val_f1_score": val_metrics["f1_score"],
-                    "val_f1": val_metrics["f1"],
-                    "lr": current_lr,
-                    "peak_allocated_gb": peak_alloc_gb,
-                    "peak_reserved_gb": peak_reserved_gb,
-                    "largest_batch": batch_stats,
-                }
+    for epoch in tqdm(range(1, args.epochs + 1)):
+        train_loss = train_one_epoch(model, train_loader, optimizer, device, class_weights)
+        val_metrics = evaluate(model, val_loader, device, args.threshold)
+        val_score = metric_for_best_model(val_metrics, "pr_auc")
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "val_pr_auc": val_metrics["pr_auc"],
+                "val_roc_auc": val_metrics["roc_auc"],
+                "val_auc": val_metrics["roc_auc"],
+                "val_f1_score": val_metrics["f1_score"],
+                "val_f1": val_metrics["f1"],
+            }
+        )
+        print(
+            "epoch={epoch:03d} loss={loss:.4f} val_pr_auc={pr_auc} val_roc_auc={roc_auc} val_f1={f1}".format(
+                epoch=epoch,
+                loss=train_loss,
+                pr_auc=format_metric(val_metrics["pr_auc"]),
+                roc_auc=format_metric(val_metrics["roc_auc"]),
+                f1=format_metric(val_metrics["f1_score"]),
             )
-            if peak_alloc_gb is not None:
-                print(f"  CUDA 峰值: allocated={peak_alloc_gb:.2f} GiB, reserved={peak_reserved_gb:.2f} GiB")
-            if batch_stats:
-                names = [str(samples[index].get("apk_name")) for index in batch_stats["sample_indices"]]
-                print(f"  最大图批次: nodes={batch_stats['max_nodes']}, edges={batch_stats['max_edges']}, APK={names}")
-            print(
-                "epoch={epoch:03d} loss={loss:.4f} val_pr_auc={pr_auc} val_roc_auc={roc_auc} val_f1={f1}".format(
-                    epoch=epoch,
-                    loss=train_loss,
-                    pr_auc=format_metric(val_metrics["pr_auc"]),
-                    roc_auc=format_metric(val_metrics["roc_auc"]),
-                    f1=format_metric(val_metrics["f1_score"]),
-                )
-            )
+        )
 
-            if val_score is not None and val_score > best_val_score:
-                candidate_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
-                save_best_checkpoint(torch, checkpoint_path, candidate_state, metadata, args)
-                best_val_score = float(val_score)
-                best_state = candidate_state
-                best_epoch = epoch
-                stale_epochs = 0
-            else:
-                stale_epochs += 1
-                if stale_epochs >= args.patience:
-                    break
-    except BaseException:
-        if batch_stats:
-            names = [str(samples[index].get("apk_name")) for index in batch_stats["sample_indices"]]
-            print(f"当前 epoch 最大图批次: nodes={batch_stats['max_nodes']}, "
-                  f"edges={batch_stats['max_edges']}, APK={names}", file=sys.stderr)
-        if best_epoch is not None:
-            print(f"训练中断；epoch {best_epoch} 的最佳模型已保存: {checkpoint_path}", file=sys.stderr)
+        if val_score is not None and val_score > best_val_score:
+            best_val_score = float(val_score)
+            best_state = {key: value.detach().cpu() for key, value in model.state_dict().items()}
+            stale_epochs = 0
         else:
-            print("训练中断，尚无已完成验证的最佳 epoch。", file=sys.stderr)
-        raise
+            stale_epochs += 1
+            if stale_epochs >= args.patience:
+                break
 
     if best_state is not None:
         model.load_state_dict(best_state)
@@ -282,7 +185,8 @@ def main() -> None:
     print("评估模型")
     train_metrics = evaluate(model, train_loader, device, args.threshold)
     val_metrics = evaluate(model, val_loader, device, args.threshold)
-    # 节点类型嵌入维度为 0 时对应标准 GATv2。
+    # 沿用 gatv2_model.pt 文件名，避免重命名已有模型文件；嵌入维度为 0 时对应标准 GATv2。
+    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "gatv2_model.pt"
     summary = {
         "train": train_metrics,
         "val": val_metrics,
@@ -292,11 +196,7 @@ def main() -> None:
         "n_test_reserved": len(test_idx),
         "split_source": split_source,
         "train_class_counts": {"benign": train_counts[0], "malware": train_counts[1]},
-        "class_weight_mode": args.class_weight,
         "class_weights": weight_values,
-        "readout": args.readout if args.model_type == "atgatv2" else "app",
-        "node_type_order": "legacy" if args.model_type == "atgatv2" else None,
-        "best_epoch": best_epoch,
         "threshold": float(args.threshold),
         "best_model_metric": "pr_auc",
         "best_val_score": best_val_score,
@@ -304,9 +204,6 @@ def main() -> None:
         "model_filename": model_filename,
         "workers": worker_count,
         "prefetch_factor": args.prefetch_factor,
-        "effective_batch_size": args.batch_size,
-        "micro_batch_size": args.micro_batch_size,
-        "activation_checkpointing": args.activation_checkpointing,
         "metadata": {
             "node_types": metadata[0],
             "edge_types": [list(edge_type) for edge_type in metadata[1]],
@@ -317,8 +214,23 @@ def main() -> None:
     write_json(metrics_dir / "train_metrics.json", summary)
     write_json(logs_dir / "history.json", {"history": history})
     write_json(logs_dir / "train_config.json", vars(args))
-    if best_state is None:
-        save_best_checkpoint(torch, checkpoint_path, model.state_dict(), metadata, args)
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "metadata": metadata,
+            "model_type": args.model_type,
+            "model_config": {
+                "hidden_channels": args.hidden_channels,
+                "layers": args.layers,
+                "heads": args.heads,
+                "dropout": args.dropout,
+                "model_type": args.model_type,
+                "type_embedding_dim": args.type_embedding_dim,
+            },
+            "train_args": vars(args),
+        },
+        model_dir / model_filename,
+    )
     print(json.dumps(summary["val"], ensure_ascii=False, indent=2))
 
 

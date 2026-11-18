@@ -1,4 +1,3 @@
-import pickle
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,7 +5,6 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from phase2.graph.train import save_best_checkpoint
 from phase2.lightgbm.model import load_artifacts
 from phase2.lightgbm.train import best_checkpoint_callback
 
@@ -14,13 +12,6 @@ from phase2.lightgbm.train import best_checkpoint_callback
 class FakeBooster:
     def model_to_string(self, num_iteration):
         return f"trees={num_iteration}"
-
-
-class PickleTorch:
-    @staticmethod
-    def save(payload, path):
-        with Path(path).open("wb") as handle:
-            pickle.dump(payload, handle)
 
 
 class TrainingCheckpointTests(unittest.TestCase):
@@ -46,28 +37,6 @@ class TrainingCheckpointTests(unittest.TestCase):
             self.assertEqual(vectorizer, {"vectorizer": True})
             self.assertEqual(indices.tolist(), [0])
             self.assertEqual(names, ["feature"])
-
-    def test_graph_best_checkpoint_is_not_replaced_by_failed_save(self):
-        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
-            path = Path(directory) / "gatv2_model.pt"
-            args = SimpleNamespace(model_type="atgatv2", hidden_channels=8, layers=2, heads=2,
-                                   dropout=0.1, type_embedding_dim=4, readout="mean")
-            save_best_checkpoint(PickleTorch, path, {"weight": 1}, (["api"], []), args)
-            original = path.read_bytes()
-
-            class FailingTorch:
-                @staticmethod
-                def save(payload, destination):
-                    raise RuntimeError("simulated out of memory while saving")
-
-            with self.assertRaises(RuntimeError):
-                save_best_checkpoint(FailingTorch, path, {"weight": 2}, (["api"], []), args)
-            self.assertEqual(path.read_bytes(), original)
-            with path.open("rb") as handle:
-                saved = pickle.load(handle)
-                self.assertEqual(saved["state_dict"], {"weight": 1})
-                self.assertEqual(saved["model_config"]["node_type_order"], "legacy")
-
 
 if __name__ == "__main__":
     unittest.main()

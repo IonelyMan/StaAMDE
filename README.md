@@ -40,9 +40,7 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 注意修改参数
 ```
 
-图训练默认使用训练集类别频数的反比作为交叉熵权重，让少数类获得更大的损失权重；权重按训练样本的平均值归一化，验证集和测试集不参与计算。可使用 `--class-weight sqrt` 减弱加权，或使用 `--class-weight none` 关闭加权。训练日志与 `metrics/train_metrics.json` 记录训练类别数量和权重；训练集须同时包含良性和恶意样本。其他默认配置仍为全图均值读出、固定学习率和不裁剪梯度；已有的 `train/`、`val/` 划分保持不变。后续检查点仍记录模型配置，推理与解释可读取旧模型以及此前生成的不同配置模型。
-
-图训练默认使用有效批次 8、GPU 微批次 1，并对 ATGATv2 注意力层启用激活重计算，以降低大图训练的显存峰值。`--micro-batch-size` 可调每次送入 GPU 的图数，须整除 `--batch-size`；显存充足时可调大以加快训练。`--no-activation-checkpointing` 可关闭激活重计算。日志及 `logs/history.json` 记录每轮 CUDA 峰值显存和最大图批次的节点、边数量及 APK 名称，可据此排查异常大图。
+图训练使用基于训练集类别频数反比的交叉熵权重，使少数类获得更高权重；训练集须同时包含良性和恶意样本。训练日志及 `metrics/train_metrics.json` 记录类别数量和权重。训练仍使用完整批次和固定学习率，按验证集 PR-AUC 选择最佳模型；不启用梯度累积或激活重计算。
 
 
 
@@ -50,13 +48,13 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 
 ```bash
 python -m phase2.lightgbm.inference --input /home/linux/7T/lzw/datasets/android_zoo/android_static --model-dir runs/static_lgbm/models --output inference/lightgbm --split test
-python -m phase2.graph.inference --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --model-path runs/hetero_gatv2/models/atgatv2_model.pt --output inference/atgatv2 --split test
+python -m phase2.graph.inference --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --model-path runs/hetero_gatv2/models/gatv2_model.pt --output inference/atgatv2 --split test
 python ensemble_predict.py --input static=inference/lightgbm/predictions/test_predictions.csv --input graph=inference/atgatv2/predictions/test_predictions.csv --output ensemble
 ```
 
 模型类型参数现统一为 `atgatv2`，目录名不影响模型加载。
 
-训练期间图模型每次刷新验证集最佳指标都会更新 `models/atgatv2_model.pt`（HGT 为 `hgt_model.pt`）；LightGBM 会写出包含模型及特征映射的 `models/best_checkpoint.joblib`。若后续轮次报错，已完成验证的最佳检查点可继续用于推理和解释；成功训练后 LightGBM 仍保存原有模型文件。尚未完成首轮验证时无法生成本次训练的最佳检查点。
+图模型训练结束后保存 `models/gatv2_model.pt`（HGT 为 `hgt_model.pt`），训练中断时不会保存本次运行的模型；LightGBM 会写出包含模型及特征映射的 `models/best_checkpoint.joblib`，后续轮次报错时已保存的最佳检查点可继续用于推理和解释。
 
 集成结果在 `ensemble/ensemble_predictions.csv`。输入 CSV 需要包含 `sample_key`，或者包含可构造该键的 `sample_id,split,y_true`。两个分支只按 `sample_key`（划分、标签、样本 ID）对齐；不同划分或类别允许重用 `sample_id`。无法对齐的记录会提示并排除；同一分支内重复的 `sample_key` 仍需先排查，不能按行号配对。
 

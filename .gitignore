@@ -14,3 +14,5 @@ tmp/
 cleanup_audit/
 logs/
 old_experiment_result/
+*.docx
+*revision*

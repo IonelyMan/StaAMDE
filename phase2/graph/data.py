@@ -14,12 +14,6 @@ GRAPH_DATA_FILENAMES = ("hetero_graph_data.pt", "hetero_graph.pt")
 GRAPH_META_FILENAME = "hetero_graph_meta.json"
 
 
-def global_node_type_ids(local_types: Sequence[str], node_types: Sequence[str]) -> List[int]:
-    type_ids = {name: index for index, name in enumerate(node_types)}
-    unknown_id = len(node_types)
-    return [type_ids.get(name, unknown_id) for name in local_types]
-
-
 def load_graph(path: Path):
     import torch
 
@@ -41,29 +35,13 @@ def load_graph_meta(path: Path) -> Dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def to_homogeneous_graph(data, node_types: Optional[Sequence[str]] = None):
+def to_homogeneous_graph(data):
     if hasattr(data, "edge_index") and hasattr(data, "x"):
-        if hasattr(data, "edge_type"):
-            del data.edge_type
         return data
-    local_types = list(data.node_types)
     try:
-        # ATGATv2 consumes node_type and edge_index, but never the per-edge type tensor.
-        homogeneous = data.to_homogeneous(node_attrs=["x"], add_node_type=True, add_edge_type=False)
+        return data.to_homogeneous(node_attrs=["x"], add_node_type=True, add_edge_type=True)
     except TypeError:
-        homogeneous = data.to_homogeneous()
-        if hasattr(homogeneous, "edge_type"):
-            del homogeneous.edge_type
-    if node_types is not None:
-        import torch
-
-        local_to_global = torch.tensor(
-            global_node_type_ids(local_types, node_types),
-            dtype=torch.long,
-            device=homogeneous.node_type.device,
-        )
-        homogeneous.node_type = local_to_global[homogeneous.node_type]
-    return homogeneous
+        return data.to_homogeneous()
 
 
 def resolve_workers(workers: Optional[int]) -> int:
@@ -192,8 +170,6 @@ def load_train_val_samples(input_dir: Optional[Path], index_path: Optional[Path]
     if input_dir:
         train_dir = input_dir / "train"
         val_dir = input_dir / "val"
-        if train_dir.exists() != val_dir.exists():
-            raise ValueError(f"图数据目录必须同时包含 train/ 和 val/，当前目录: {input_dir}")
         if train_dir.exists() and val_dir.exists():
             return read_graph_root(train_dir, forced_split="train") + read_graph_root(val_dir, forced_split="val")
         return read_graph_root(input_dir)
@@ -218,8 +194,6 @@ def split_indices_auto(
         train_idx = [idx for idx, split in enumerate(splits) if split == "train"]
         val_idx = [idx for idx, split in enumerate(splits) if split == "val"]
         return train_idx, val_idx, [], "existing_train_val"
-    if split_counts:
-        raise ValueError(f"已有部分数据划分但缺少 train 或 val，拒绝重新随机划分: {dict(split_counts)}")
     train_idx, val_idx, test_idx = random_split_indices(labels, test_size, val_size, seed)
     return train_idx.tolist(), val_idx.tolist(), test_idx.tolist(), "random"
 
@@ -270,11 +244,10 @@ def collect_metadata(
 
 
 class GraphDataset:
-    def __init__(self, samples: Sequence[Dict[str, object]], indices: Sequence[int], data_format: str = "homogeneous", node_types: Optional[Sequence[str]] = None):
+    def __init__(self, samples: Sequence[Dict[str, object]], indices: Sequence[int], data_format: str = "homogeneous"):
         self.samples = list(samples)
         self.indices = list(indices)
         self.data_format = data_format
-        self.node_types = list(node_types) if node_types is not None else None
 
     def __len__(self) -> int:
         return len(self.indices)
@@ -286,7 +259,7 @@ class GraphDataset:
         sample = self.samples[sample_index]
         data = load_graph(Path(str(sample["graph_path"])))
         if self.data_format == "homogeneous":
-            data = to_homogeneous_graph(data, self.node_types)
+            data = to_homogeneous_graph(data)
         data.y = torch.tensor([int(sample["label"])], dtype=torch.long)
         # Avoid names containing "index": PyG Batch treats them as node indices
         # and auto-increments them by num_nodes, which corrupts sample ids.

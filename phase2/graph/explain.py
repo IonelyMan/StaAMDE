@@ -132,8 +132,7 @@ def explain_one_sample(model, sample: Dict[str, object], device, threshold: floa
     meta = load_graph_meta(Path(str(sample.get("meta_path") or Path(str(sample["graph_path"])).with_name("hetero_graph_meta.json"))))
     lookup = node_lookup_from_hetero(hetero, meta)
 
-    node_types = model.node_types if getattr(model, "node_type_order", "legacy") == "global" else None
-    data = to_homogeneous_graph(hetero, node_types)
+    data = to_homogeneous_graph(hetero)
     data.y = torch.tensor([int(sample["label"])], dtype=torch.long)
     data = data.to(device)
 
@@ -231,8 +230,6 @@ def main() -> None:
         config["dropout"],
         model_type="atgatv2",
         type_embedding_dim=config.get("type_embedding_dim", 16),
-        readout=config.get("readout", "mean"),
-        node_type_order=config.get("node_type_order", "legacy"),
     ).to(device)
 
     input_dir, index_path, forced_split = resolve_graph_inputs(
@@ -257,8 +254,7 @@ def main() -> None:
         raise SystemExit("Multiple graph samples share an APK directory name; select one with --sample-id.")
 
     first_hetero = load_graph(Path(str(samples[0]["graph_path"])))
-    node_types = model.node_types if getattr(model, "node_type_order", "legacy") == "global" else None
-    first = to_homogeneous_graph(first_hetero, node_types).to(device)
+    first = to_homogeneous_graph(first_hetero).to(device)
     with torch.no_grad():
         model(first)
     model.load_state_dict(checkpoint["state_dict"])
