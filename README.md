@@ -40,7 +40,9 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 注意修改参数
 ```
 
-图训练使用基于训练集类别频数反比的交叉熵权重，使少数类获得更高权重；训练集须同时包含良性和恶意样本。训练日志及 `metrics/train_metrics.json` 记录类别数量和权重。训练仍使用完整批次和固定学习率，按验证集 PR-AUC 选择最佳模型；不启用梯度累积或激活重计算。
+图训练默认使用基于训练集类别频数反比的交叉熵权重（`--class-weight balanced`），使少数类获得更高权重；使用该模式时训练集须同时包含良性和恶意样本。传入 `--class-weight none` 可关闭权重，使用普通交叉熵。训练日志及 `metrics/train_metrics.json` 记录类别数量、模式和权重。训练仍使用完整批次和固定学习率，按验证集 PR-AUC 选择最佳模型；不启用梯度累积或激活重计算。
+
+使用 `train_graph.sh` 时，可通过 `GRAPH_CLASS_WEIGHT=none ./train_graph.sh` 关闭类别权重；不设置时默认启用。
 
 
 

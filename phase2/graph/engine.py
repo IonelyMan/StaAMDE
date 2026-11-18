@@ -15,7 +15,10 @@ def train_one_epoch(model, loader, optimizer, device, class_weights=None) -> flo
         batch = batch.to(device)
         optimizer.zero_grad()
         logits = model(batch)
-        loss = F.cross_entropy(logits, batch.y.view(-1), weight=class_weights, reduction="sum") / batch.y.numel()
+        if class_weights is None:
+            loss = F.cross_entropy(logits, batch.y.view(-1))
+        else:
+            loss = F.cross_entropy(logits, batch.y.view(-1), weight=class_weights, reduction="sum") / batch.y.numel()
         loss.backward()
         optimizer.step()
         total_loss += float(loss.detach().cpu()) * batch.y.numel()

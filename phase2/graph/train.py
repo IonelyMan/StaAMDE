@@ -31,12 +31,16 @@ def dataloader_kwargs(worker_count: int, prefetch_factor: int) -> dict:
     }
 
 
-def training_class_weights(labels: np.ndarray, train_idx):
+def training_class_weights(labels: np.ndarray, train_idx, mode: str = "balanced"):
     """Return binary class counts and inverse-frequency weights from the training split."""
     train_labels = labels[np.asarray(train_idx, dtype=np.int64)]
     if not np.isin(train_labels, [0, 1]).all():
         raise ValueError("图分类只支持标签 0（良性）和 1（恶意）")
     counts = np.bincount(train_labels, minlength=2)
+    if mode == "none":
+        return counts.tolist(), None
+    if mode != "balanced":
+        raise ValueError(f"未知类别权重模式: {mode}")
     if (counts == 0).any():
         raise ValueError(f"计算类别权重需要训练集同时包含两类样本，当前类别计数: {counts.tolist()}")
     weights = counts.sum() / (2.0 * counts.astype(np.float64))
@@ -58,6 +62,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--type-embedding-dim", type=int, default=16, help="ATGATv2 同构图中的节点类型嵌入维度，0 则退化为标准 GATv2")
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--class-weight", choices=["balanced", "none"], default="balanced",
+                        help="balanced：按训练集类别频数加权（默认）；none：不使用类别权重")
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--val-size", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=42)
@@ -101,15 +107,17 @@ def main() -> None:
         args.val_size,
         args.seed,
     )
-    train_counts, weight_values = training_class_weights(labels, train_idx)
-    print(f"训练类别计数={train_counts}，类别权重={weight_values}（顺序：良性、恶意）")
+    train_counts, weight_values = training_class_weights(labels, train_idx, args.class_weight)
+    print(f"训练类别计数={train_counts}，类别权重模式={args.class_weight}，"
+          f"类别权重={weight_values}（顺序：良性、恶意）")
     print("扫描图元数据")
     metadata = collect_metadata(samples, workers=worker_count)
 
     device = "cuda:0" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
         device = "cpu"
-    class_weights = torch.tensor(weight_values, dtype=torch.float32, device=device)
+    class_weights = (torch.tensor(weight_values, dtype=torch.float32, device=device)
+                     if weight_values is not None else None)
 
     loader_kwargs = dataloader_kwargs(worker_count, args.prefetch_factor)
     data_format = "heterogeneous" if args.model_type == "hgt" else "homogeneous"
@@ -196,6 +204,7 @@ def main() -> None:
         "n_test_reserved": len(test_idx),
         "split_source": split_source,
         "train_class_counts": {"benign": train_counts[0], "malware": train_counts[1]},
+        "class_weight_mode": args.class_weight,
         "class_weights": weight_values,
         "threshold": float(args.threshold),
         "best_model_metric": "pr_auc",

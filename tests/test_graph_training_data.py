@@ -17,8 +17,15 @@ class GraphTrainingDataTests(unittest.TestCase):
         self.assertEqual(args.batch_size, 8)
         self.assertEqual(args.lr, 0.001)
         self.assertEqual(args.dropout, 0.25)
-        self.assertFalse(hasattr(args, "class_weight"))
+        self.assertEqual(args.class_weight, "balanced")
         self.assertFalse(hasattr(args, "micro_batch_size"))
+
+    def test_class_weight_modes_can_be_selected(self):
+        for mode in ("balanced", "none"):
+            with self.subTest(mode=mode), patch.object(
+                sys, "argv", ["train", "--output", "unused", "--class-weight", mode]
+            ):
+                self.assertEqual(parse_args().class_weight, mode)
 
     def test_existing_train_val_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -56,6 +63,11 @@ class GraphTrainingDataTests(unittest.TestCase):
     def test_class_weights_reject_missing_training_class(self):
         with self.assertRaises(ValueError):
             training_class_weights(np.array([0, 0, 1]), [0, 1])
+
+    def test_unweighted_mode_accepts_missing_class_and_ignores_held_out_labels(self):
+        counts, weights = training_class_weights(np.array([0, 0, 1, 1]), [0, 1], "none")
+        self.assertEqual(counts, [2, 0])
+        self.assertIsNone(weights)
 
 
 if __name__ == "__main__":
