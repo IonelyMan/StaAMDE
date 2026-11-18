@@ -2,6 +2,8 @@ def normalize_checkpoint_model_type(value: object) -> str:
     """Map current and earlier GATv2 checkpoint identifiers to ATGATv2."""
     if value == "hgt":
         return "hgt"
+    if value == "atgatv2":
+        return "atgatv2"
     if isinstance(value, str) and value.lower().endswith("gatv2"):
         return "atgatv2"
     raise ValueError(f"未知图模型类型: {value}")
