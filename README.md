@@ -21,6 +21,9 @@ PyTorch Geometric 的安装方式需与本机 PyTorch/CUDA 版本匹配。
 
 ## 数据准备与训练
 
+本研究提供了实验所用的4个数据集，百度网盘地址为：https://pan.baidu.com/s/1IBr__zLv5gxPVheBADBXhA
+由于APK发行的版权原因以及恶意APK的传播限制，如有复现需求的读者通过邮箱（12025219065@stu.ynu.edu.cn）联系我们提供“提取码”
+
 原始 APK 可按 `data/apks/{train,val,test}/{mal,benign}/` 放置。
 
 ```bash
@@ -31,13 +34,17 @@ nohup setsid python phase1/build_heterogeneous.py --dataset-root /root/autodl-tm
 ```
 
 ## 训练代码
+
 ```bash
+决策树训练：
 python -m phase2.lightgbm.train --input /home/linux/7T/lzw/datasets/android_zoo/android_static --output runs/static_lgbm --mi-k 5000 --workers 4 --class-weight balanced
+
+图结构训练：
 python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEMAD_datasets/android_graphs --output runs/hetero_gatv2 --model-type atgatv2 --workers 4
 
 或直接运行./train_lightgbm.sh
 ./train_graph.sh
-注意修改参数
+注意修改参数，图训练默认不使用类别加权
 ```
 
 图训练默认使用基于训练集类别频数反比的交叉熵权重（`--class-weight balanced`），使少数类获得更高权重；使用该模式时训练集须同时包含良性和恶意样本。传入 `--class-weight none` 可关闭权重，使用普通交叉熵。训练日志及 `metrics/train_metrics.json` 记录类别数量、模式和权重。训练仍使用完整批次和固定学习率，按验证集 PR-AUC 选择最佳模型；不启用梯度累积或激活重计算。
@@ -71,7 +78,7 @@ python ensemble_predict.py \
   --tune-weights --tune-threshold --output ensemble
 ```
 
-调参时输入必须分别标记为 `test` 和 `val`；两个集合可以有相同的 `sample_id`，但必须使用独立的 APK 样本。没有验证集时请使用固定的权重和阈值，不要启用搜索。此前在测试集上搜索得到的权重、阈值和指标不能作为无泄漏的测试结果。
+调参时输入必须分别标记为 `test` 和 `val`；两个集合可以有相同的 `sample_id`，但必须使用独立的 APK 样本。没有验证集时请使用固定的权重和阈值，不要启用搜索。
 
 错误 APK 及其静态报告、图数据的按划分清理工具见 [deduplicate/README.md](deduplicate/README.md)。
 

@@ -194,7 +194,7 @@ def main() -> None:
     train_metrics = evaluate(model, train_loader, device, args.threshold)
     val_metrics = evaluate(model, val_loader, device, args.threshold)
     # 沿用 gatv2_model.pt 文件名，避免重命名已有模型文件；嵌入维度为 0 时对应标准 GATv2。
-    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "gatv2_model.pt"
+    model_filename = "hgt_model.pt" if args.model_type == "hgt" else "atgatv2_model.pt"
     summary = {
         "train": train_metrics,
         "val": val_metrics,

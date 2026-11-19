@@ -169,5 +169,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        print(f"程序运行出错: {e}")
+        traceback.print_exc()
     # 训练lightgbm模型，无需使用GPU，使用CPU即可。
