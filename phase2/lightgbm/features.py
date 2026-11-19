@@ -1,6 +1,7 @@
 import math
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Dict, List
 
 API_FAMILY_PATTERNS = {
@@ -20,6 +21,13 @@ API_FAMILY_PATTERNS = {
     "device_admin": [r"DeviceAdminReceiver", r"DevicePolicyManager"],
 }
 
+# Each family is a disjunction of case-insensitive patterns. Compile once per
+# process and reuse classifications for API names repeated across APKs.
+_API_FAMILY_REGEX = tuple(
+    (family, re.compile("|".join(f"(?:{pattern})" for pattern in patterns), re.IGNORECASE))
+    for family, patterns in API_FAMILY_PATTERNS.items()
+)
+
 
 def add_feature(features: Dict[str, float], name: str, value: float = 1.0) -> None:
     if name:
@@ -37,12 +45,14 @@ def add_count_dict(features: Dict[str, float], prefix: str, values, use_log: boo
         add_feature(features, f"{prefix}:{key}", math.log1p(numeric) if use_log else numeric)
 
 
+@lru_cache(maxsize=65536)
+def _classify_api_family_cached(api_call: str) -> tuple:
+    return tuple(family for family, pattern in _API_FAMILY_REGEX if pattern.search(api_call))
+
+
 def classify_api_family(api_call: str) -> List[str]:
-    families = []
-    for family, patterns in API_FAMILY_PATTERNS.items():
-        if any(re.search(pattern, api_call, re.IGNORECASE) for pattern in patterns):
-            families.append(family)
-    return families
+    # Return a fresh list as before, so callers cannot mutate the cache.
+    return list(_classify_api_family_cached(api_call))
 
 
 def flatten_report(report: Dict[str, object]) -> Dict[str, float]:

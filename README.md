@@ -47,6 +47,8 @@ python -m phase2.graph.train --input /home/linux/7T/lzw/datasets/android_zoo/EEM
 注意修改参数，图训练默认不使用类别加权
 ```
 
+树模型训练日志分别记录静态数据加载、特征向量化、互信息选择、训练和最佳检查点保存的耗时，可据此定位服务器上的瓶颈。`--workers` 控制静态报告加载进程数；LightGBM 训练和互信息计算使用各自的并行设置。
+
 图训练默认使用基于训练集类别频数反比的交叉熵权重（`--class-weight balanced`），使少数类获得更高权重；使用该模式时训练集须同时包含良性和恶意样本。传入 `--class-weight none` 可关闭权重，使用普通交叉熵。训练日志及 `metrics/train_metrics.json` 记录类别数量、模式和权重。训练仍使用完整批次和固定学习率，按验证集 PR-AUC 选择最佳模型；不启用梯度累积或激活重计算。
 
 使用 `train_graph.sh` 时，可通过 `GRAPH_CLASS_WEIGHT=none ./train_graph.sh` 关闭类别权重；不设置时默认启用。

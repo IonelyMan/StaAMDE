@@ -2,6 +2,7 @@ import argparse
 import json
 import math
 import sys
+from time import perf_counter
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +24,7 @@ from phase2.lightgbm.reports import write_feature_scores, write_json, write_ligh
 def lgb_pr_auc_metric(y_true, y_pred):
     y_true = np.asarray(y_true, dtype=np.int64)
     y_pred = np.asarray(y_pred, dtype=np.float64)
-    if len(set(y_true.tolist())) < 2:
+    if y_true.size == 0 or np.all(y_true == y_true[0]):
         return "pr_auc", 0.0, True
     return "pr_auc", float(average_precision_score(y_true, y_pred)), True
 
@@ -38,8 +39,11 @@ def best_checkpoint_callback(model_dir, vectorizer, selected_indices, selected_n
             if result[0] == "valid_0" and result[1] == "pr_auc":
                 score = float(result[2])
                 if math.isfinite(score) and score > best_score:
+                    checkpoint_started = perf_counter()
                     save_validation_checkpoint(env.model, env.iteration + 1, score, vectorizer,
                                                selected_indices, selected_names, model_dir)
+                    callback.save_seconds += perf_counter() - checkpoint_started
+                    callback.save_count += 1
                     best_score = score
                     callback.saved_iteration = env.iteration + 1
                 break
@@ -47,6 +51,8 @@ def best_checkpoint_callback(model_dir, vectorizer, selected_indices, selected_n
     callback.order = 20
     callback.before_iteration = False
     callback.saved_iteration = None
+    callback.save_seconds = 0.0
+    callback.save_count = 0
     return callback
 
 
@@ -86,7 +92,9 @@ def main() -> None:
         raise SystemExit("缺少 lightgbm，请先安装 requirements.txt 中的依赖。") from exc
 
     print(f"加载数据集，workers={args.workers}")
+    stage_started = perf_counter()
     dataset = load_static_train_val_dataset(Path(args.input), workers=args.workers)
+    print(f"数据加载与特征提取耗时: {perf_counter() - stage_started:.2f} 秒")
     print("数据集大小:", np.size(dataset.labels))
     train_idx, val_idx, test_idx, split_source = split_indices_auto(
         dataset.labels,
@@ -96,13 +104,19 @@ def main() -> None:
         args.seed,
     )
 
+    print("向量化特征")
+    stage_started = perf_counter()
     vectorizer = DictVectorizer(sparse=True)
     vectorizer.fit([dataset.features[int(index)] for index in train_idx])
     X = vectorizer.transform(dataset.features)
     feature_names = list(vectorizer.get_feature_names_out())
+    print(f"特征向量化耗时: {perf_counter() - stage_started:.2f} 秒；矩阵形状: {X.shape}")
+    print("计算互信息并选择特征")
+    stage_started = perf_counter()
     selected_indices, mi_scores = select_by_mutual_info(X[train_idx], dataset.labels[train_idx], args.mi_k, args.seed)
     selected_names = [feature_names[int(index)] for index in selected_indices]
     X_selected = X[:, selected_indices]
+    print(f"互信息及特征选择耗时: {perf_counter() - stage_started:.2f} 秒；选中特征: {len(selected_indices)}")
     print("加载模型")
     model = lgb.LGBMClassifier(
         objective="binary",
@@ -123,6 +137,7 @@ def main() -> None:
     callbacks = [checkpoint_callback, lgb.log_evaluation(50)]
     if args.early_stopping > 0 and len(set(dataset.labels[val_idx].tolist())) == 2:
         callbacks.append(lgb.early_stopping(args.early_stopping))
+    stage_started = perf_counter()
     try:
         model.fit(
             X_train,
@@ -139,9 +154,10 @@ def main() -> None:
         else:
             print("训练中断，尚无已完成验证轮次，无法保存最佳模型。", file=sys.stderr)
         raise
-    print("模型训练完成")
-    train_probs = predict_probability(model, X_selected[train_idx])
-    val_probs = predict_probability(model, X_selected[val_idx])
+    print(f"模型训练耗时: {perf_counter() - stage_started:.2f} 秒；"
+          f"其中保存 {checkpoint_callback.save_count} 次最佳检查点耗时 {checkpoint_callback.save_seconds:.2f} 秒")
+    train_probs = predict_probability(model, X_train)
+    val_probs = predict_probability(model, X_val)
     train_metrics = binary_metrics(dataset.labels[train_idx], train_probs, args.threshold)
     val_metrics = binary_metrics(dataset.labels[val_idx], val_probs, args.threshold)
 
