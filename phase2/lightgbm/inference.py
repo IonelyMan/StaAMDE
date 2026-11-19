@@ -1,10 +1,13 @@
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
+from time import perf_counter
 from typing import List, Optional
 
 import numpy as np
+from sklearn.feature_extraction import DictVectorizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -51,6 +54,22 @@ def subset(dataset: StaticDataset, indices: np.ndarray):
     )
 
 
+def selected_vectorizer_transform(vectorizer, selected_indices, feature_dicts):
+    """Transform directly into the selected feature space when the artifact permits it."""
+    indices = np.asarray(selected_indices)
+    if (type(vectorizer) is not DictVectorizer or indices.ndim != 1
+            or not np.issubdtype(indices.dtype, np.integer)
+            or len(np.unique(indices)) != len(indices)
+            or np.any(indices < 0) or np.any(indices >= len(vectorizer.feature_names_))):
+        return vectorizer.transform(feature_dicts)[:, selected_indices]
+    selected = {int(original): position for position, original in enumerate(indices)}
+    reduced = copy.copy(vectorizer)
+    reduced.vocabulary_ = {name: selected[index] for name, index in vectorizer.vocabulary_.items()
+                           if index in selected}
+    reduced.feature_names_ = [vectorizer.feature_names_[int(index)] for index in indices]
+    return reduced.transform(feature_dicts)
+
+
 def main() -> None:
     args = parse_args()
     run_dir = Path(args.output)
@@ -62,12 +81,14 @@ def main() -> None:
     input_dir = resolve_split_input(Path(args.input), args.split)
     forced_split = args.split if args.split != "all" and input_dir.name == args.split else None
     print("加载数据集中")
+    stage_started = perf_counter()
     dataset = load_static_dataset(
         input_dir,
         forced_split=forced_split,
         read_report_split=False if forced_split else True,
         workers=args.workers,
     )
+    print(f"数据加载与特征提取耗时: {perf_counter() - stage_started:.2f} 秒")
     print("划分数据集中")
     indices = np.arange(len(dataset.splits)) if forced_split else filter_indices(dataset.splits, args.split)
     if len(indices) == 0:
@@ -75,11 +96,18 @@ def main() -> None:
 
     sample_keys, sample_ids, apk_names, splits, y, feature_dicts = subset(dataset, indices)
     print("创建数据集中")
+    stage_started = perf_counter()
     model, vectorizer, selected_indices, _ = load_artifacts(Path(args.model_dir))
-    X = vectorizer.transform(feature_dicts)[:, selected_indices]
+    print(f"加载模型耗时: {perf_counter() - stage_started:.2f} 秒")
+    stage_started = perf_counter()
+    X = selected_vectorizer_transform(vectorizer, selected_indices, feature_dicts)
+    print(f"特征向量化耗时: {perf_counter() - stage_started:.2f} 秒；矩阵形状: {X.shape}")
+    stage_started = perf_counter()
     probs = predict_probability(model, X)
+    print(f"模型预测耗时: {perf_counter() - stage_started:.2f} 秒")
 
     suffix = args.split if args.split != "all" else "all"
+    stage_started = perf_counter()
     write_predictions(
         prediction_dir / f"{suffix}_predictions.csv",
         sample_keys,
@@ -93,6 +121,7 @@ def main() -> None:
     metrics = binary_metrics(y, probs, args.threshold)
     metrics.update({"split": args.split, "n_samples": int(len(y))})
     write_json(metrics_dir / f"{suffix}_metrics.json", metrics)
+    print(f"结果写出与指标计算耗时: {perf_counter() - stage_started:.2f} 秒")
     print(json.dumps(metrics, ensure_ascii=False, indent=2))
 
 

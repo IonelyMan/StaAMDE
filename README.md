@@ -65,6 +65,8 @@ python ensemble_predict.py --input static=inference/lightgbm/predictions/test_pr
 
 模型类型参数现统一为 `atgatv2`，目录名不影响模型加载。
 
+树模型推理日志记录报告加载、模型加载、特征向量化、预测及结果输出的耗时。`--workers` 控制静态报告并行加载进程数。
+
 图模型训练结束后保存 `models/gatv2_model.pt`（HGT 为 `hgt_model.pt`），训练中断时不会保存本次运行的模型；LightGBM 会写出包含模型及特征映射的 `models/best_checkpoint.joblib`，后续轮次报错时已保存的最佳检查点可继续用于推理和解释。
 
 集成结果在 `ensemble/ensemble_predictions.csv`。输入 CSV 需要包含 `sample_key`，或者包含可构造该键的 `sample_id,split,y_true`。两个分支只按 `sample_key`（划分、标签、样本 ID）对齐；不同划分或类别允许重用 `sample_id`。无法对齐的记录会提示并排除；同一分支内重复的 `sample_key` 仍需先排查，不能按行号配对。
