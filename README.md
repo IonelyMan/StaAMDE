@@ -5,7 +5,7 @@
 
 **StaAMDE: A Static Analysis-Based Framework for Android Malware Detection and Evidence-Constrained Explanations**
 
-Abstract：As the Android application ecosystem continues to evolve, malware detection is becoming increasingly challenging. Existing detection methods are prone to performance degradation under conditions of data class imbalance and time variation, while traditional discriminative evidence also suffers from limited readability. To address these issues, this paper proposes StaAMDE, a static analysis-based framework for Android malware detection and evidence-constrained explanations. In Stage 1, a dual-branch framework is employed to jointly model the static semantic fea-tures of APKs and their heterogeneous graph structures for classification while generating decision evidence. For the graph structure branch, we design ATGATv2, which uses node-type embeddings to retain type information for dif-ferent program entities and aggregates neighborhood information using GATv2, thereby capturing key attention-based evidence while preserving the distinctions between heterogeneous entities. In Stage 2, attribution evidence from the two branches is integrated to constrain the LLM in generating user-friendly explanation reports. Compared with the baselines, StaAMDE achieves better overall performance under class imbalance and temporal distribution shifts, demonstrating its effectiveness in improving Android malware detection performance. This framework decouples classification decisions from semantic explanation, making decision evidence easier to understand while improving detection performance. The source code is available at https://github.com/IonelyMan/StaAMDE.git.
+Abstract：As the Android application ecosystem continues to evolve, malware detection is becoming increasingly challenging. Existing detection methods are prone to performance degradation under conditions of data class imbalance and time variation, while traditional discriminative evidence also suffers from limited user-friendliness. To address these issues, this paper proposes StaAMDE, a static analysis-based framework for Android malware detection and evidence-constrained explanations. In Stage 1, a dual-branch framework is employed to jointly model the static semantic features of APKs and their heterogeneous graph structures for classification while generating decision evidence. For the graph structure branch, we design ATGATv2, which uses node-type embeddings to retain type information for different program entities and aggregates neighborhood information using GATv2, thereby capturing key attention-based evidence while preserving the distinctions between heterogeneous entities. In Stage 2, attribution evidence from the two branches is integrated to constrain the LLM in generating explanation reports. Compared with the baselines, StaAMDE achieves better overall performance under class imbalance and temporal distribution shifts, demonstrating its effectiveness in improving Android malware detection performance. This framework decouples classification decisions from semantic explanation, making decision evidence easier to understand while improving detection performance. The source code is available at [https://github.com/IonelyMan/StaAMDE.git](https://github.com/IonelyMan/EEAMD.git).
 Keywords：Android malware, User-friendliness, Static analysis, Graph attention networks, Large language models
 
 
@@ -51,8 +51,6 @@ python phase1/build_heterogeneous.py --dataset-root data/apks --belong test  --o
 ```
 
 静态报告写入 `data/android_static/<split>/<label>/<sample>/static_features_report.json`；图文件写入 `data/android_graphs/<split>/<label>/<sample>/hetero_graph.pt`，每个图划分还会生成 `index.csv`。图索引记录了生成时的图路径；移动图目录后应重新生成索引，避免推理和解释读取旧路径。
-
-数据清理工具的用法见 [deduplicate/README.md](deduplicate/README.md)。
 
 ## 模型训练
 
@@ -126,6 +124,8 @@ python -m phase2.lightgbm.explain \
 
 ## 证据组织与 LLM 解释
 
+运行解释代码前，需要配置LLM的API调用借口，位于config.py内。
+
 第三阶段对同一 APK 的预测和局部解释进行证据组织。静态分支取 **SHAP 值最大的 15 个正向特征**和 **SHAP 值最小的 5 个负向特征**，分别保留将预测推向恶意和良性的线索。图分支先从节点候选中剔除 `app` 节点、从边候选中剔除自环，再按注意力分数取最高的 **15 个节点**和 **10 条边**；每条边证据包含源节点、目标节点及其注意力分数。过滤发生在证据组织阶段，原始注意力 CSV 仍保留应用节点和自环。可用条目不足时按实际数量保留。注意力表示图模型聚合信息时的关注线索，不单独证明恶意行为。
 
 只组织证据和提示词、不调用 LLM 时，使用：
@@ -154,4 +154,4 @@ python -m phase3.aliyun_llm \
   --top-graph-nodes 15 --top-graph-edges 10
 ```
 
-`llm_explain/example.app/` 中的 `llm_evidence.json` 是筛选后的结构化证据，`llm_prompt.md` 是发送给模型的提示词，`llm_response.md` 是生成的报告。需要先检查证据而暂不调用 API 时，可在正式命令末尾添加 `--dry-run`。提示词会要求具备检索能力的模型优先核对 Android 官方文档；当前脚本仅发送提示词，不会自行联网检索文档。
+`llm_explain/example.app/` 中的 `llm_evidence.json` 是筛选后的结构化证据，`llm_prompt.md` 是发送给模型的提示词，`llm_response.md` 是生成的报告。需要先检查证据而暂不调用 API 时，可在正式命令末尾添加 `--dry-run`。提示词会要求具备检索能力的模型优先核对 Android 官方文档。
