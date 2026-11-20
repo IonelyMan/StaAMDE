@@ -20,3 +20,4 @@ zoo_android_csv_new/
 *.sh
 tests/
 deduplicate/
+cleanup_failed_test_benign.py
